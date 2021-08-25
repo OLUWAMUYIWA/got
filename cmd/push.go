@@ -16,8 +16,7 @@ limitations under the License.
 package cmd
 
 import (
-	"fmt"
-
+	"github.com/OLUWAMUYIWA/got/internal"
 	"github.com/spf13/cobra"
 )
 
@@ -27,7 +26,8 @@ var pushCmd = &cobra.Command{
 	Short: "pushes changes to a remote repository",
 	Long:  `pushes changes to a remote repository`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("push called")
+		git := internal.Git{}
+		git.Push(args[0])
 	},
 }
 

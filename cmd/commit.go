@@ -16,6 +16,7 @@ limitations under the License.
 package cmd
 
 import (
+	"github.com/OLUWAMUYIWA/got/internal"
 	"github.com/spf13/cobra"
 )
 
@@ -25,11 +26,13 @@ var commitCmd = &cobra.Command{
 	Short: "makes a commit to the local git",
 	Long:  `makes a commit to the local git.`,
 	Run: func(cmd *cobra.Command, args []string) {
-
+		msg, _ := cmd.Flags().GetString("msg")
+		git := internal.NewGit()
+		git.Commit(msg)
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(commitCmd)
-	commitCmd.Flags().BoolP("float", "f", false, "add floating point numbers")
+	addCmd.Flags().StringP("msg", "m", "new commit", "the message to be logged with the commit")
 }

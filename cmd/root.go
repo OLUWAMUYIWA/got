@@ -13,6 +13,8 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+
+//TODO: check these cmd files ago. plenty errors
 package cmd
 
 import (
@@ -29,7 +31,7 @@ var cfgFile string
 var rootCmd = &cobra.Command{
 	Use:   "got",
 	Short: "got is a minimal git client",
-	Long:  `Got suports add, commit, and push commands`,
+	Long:  `Got suports add, commit, and push commands and a number of plumbing commands too`,
 	Run: func(cmd *cobra.Command, args []string) {
 	},
 }
@@ -68,7 +70,6 @@ func initConfig() {
 	}
 
 	viper.AutomaticEnv() // read in environment variables that match
-	fmt.Println("initting config")
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())

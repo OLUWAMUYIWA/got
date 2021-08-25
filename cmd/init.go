@@ -27,7 +27,8 @@ var initCmd = &cobra.Command{
 	//TODO
 	Long: `Initializes the repository`,
 	Run: func(cmd *cobra.Command, args []string) {
-		internal.Init(args[0])
+		git := internal.Git{}
+		git.Init(args[0])
 	},
 }
 
