@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"bufio"
 	"bytes"
 	"compress/zlib"
 	"crypto/sha1"
@@ -46,8 +47,8 @@ func HashFile(name string, ty string, w, std bool) error {
 		}
 		b = bread.Bytes()
 	}
-	var git Git
-	h := git.HashObject(b, ty, std)
+	got := NewGot()
+	h := got.HashObject(b, ty, std)
 	if _, err := fmt.Fprintf(os.Stdout, "%x", h); err != nil {
 		return IOWriteErr.addContext(err.Error())
 	}
@@ -92,6 +93,16 @@ func diff(stra, strb string) string {
 	return dmp.DiffPrettyText(diffs)
 }
 
+func (got *Got) writeToFile(path string, b []byte) error {
+	f, err := os.OpenFile(path, os.O_APPEND, 0)
+	defer f.Close()
+	got.GotErr(err)
+	
+	bufWriter := bufio.NewWriter(f)
+	_, err = bufWriter.Write(b)
+	got.GotErr(err)
+	return err
+}
 
 func compress(writer io.Writer, data []byte) error {
 	comp := zlib.NewWriter(writer)

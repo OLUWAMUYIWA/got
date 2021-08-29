@@ -1,10 +1,8 @@
 package internal
 
 import (
-	"bufio"
 	"bytes"
 	"compress/zlib"
-	"crypto/sha1"
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
@@ -21,7 +19,8 @@ import (
 
 //###### PLUMBERS!!!!! #######
 //The Hitokiri Battousais. They do the killing, and they have no shame in doing it
-
+//Most Plumbers should send their errors upstream. Porcelains will handle them. Except when it is not a fit directory were in. 
+//This exception is because plumbers can be used directly by the user too
 //TODO:Check all the endianness in this code
 
 
@@ -30,11 +29,11 @@ func Config(conf ConfigObject) error {
 	if err != nil {
 		return NotDefinedErr.addContext(err.Error())
 	}
-	err = os.Mkdir(filepath.Join(confRoot, ".got"), 0)
+	err = os.Mkdir(filepath.Join(confRoot, ".git"), os.ModeDir)
 	if err != nil {
 		return IOWriteErr.addContext(err.Error())
 	}
-	f, err := os.Create(filepath.Join(confRoot, ".got", ".config"))
+	f, err := os.Create(filepath.Join(confRoot, ".git", ".config"))
 	if err != nil {
 		return IOCreateErr.addContext(err.Error())
 	}
@@ -49,10 +48,10 @@ func Config(conf ConfigObject) error {
 //HashObject returns the hash of the file it hashes
 //plumber + helper function
 //needed for blobs, trees, and commit hashes
-func (git *Git) HashObject(data []byte, ty string, shouldwrite bool) []byte {
+func (got *Got) HashObject(data []byte, ty string, shouldwrite bool) []byte {
 	base, err := os.Getwd()
 	if err != nil {
-		git.GotErr(err)
+		got.GotErr(err)
 	}
 	//use a string builder because it minimizzed memory allocation, which is expensive
 	//each write appends to the builder
@@ -74,15 +73,15 @@ func (git *Git) HashObject(data []byte, ty string, shouldwrite bool) []byte {
 	//remember that sha1 produces a 20-byte hash (160 bits, or 40 hex characters)
 	if shouldwrite {
 		path := filepath.Join(base, ".git/objects/", hash_str[:2])
-		err = os.MkdirAll(path, 0)
-		git.GotErr(err)
+		err = os.MkdirAll(path, os.ModeDir)
+		got.GotErr(err)
 		fPath := filepath.Join(path, hash_str[2:])
 		f, err := os.Create(fPath)
-		git.GotErr(err)
+		got.GotErr(err)
 		defer f.Close()
 		//the actual file is then compressed and stored in the file created
 		err = compress(f, b)
-		git.GotErr(err)
+		got.GotErr(err)
 	}
 	return raw
 }
@@ -93,7 +92,10 @@ func (git *Git) HashObject(data []byte, ty string, shouldwrite bool) []byte {
 //a full 20 byte string, we can still find the path to the file
 //it is unlikely to find two blobs with the same sha1 prefix, but if such happens, we return
 //an error and expect the user to provide a longer string
-func (git *Git) FindObject(prefix string) (string, error) {
+func (got *Got) FindObject(prefix string) (string, error) {
+	if is, _ := IsGit(); !is {
+		got.logger.Fatalf("Not a valid git directory\n")
+	}
 	//first check for length
 	switch l := len(prefix); {
 	case l <= 2:
@@ -103,7 +105,7 @@ func (git *Git) FindObject(prefix string) (string, error) {
 	}
 	path := filepath.Join(".git/objects", prefix[:2])
 	entries, err := os.ReadDir(path)
-	git.GotErr(err)
+	got.GotErr(err)
 	location := ""
 	//we also need to be sure that our given prefix is unique too. If it isn't we may be return ing the wrong file
 	num := 0
@@ -127,76 +129,112 @@ func (git *Git) FindObject(prefix string) (string, error) {
 //ReadObject bulds on findObject. First, it finds the object,
 //but it does more, it attempts to read it and assert that it contains valid git object files
 //apart from that, it tries to understand what kind of git object it is
-func (git *Git) readObject(prefix string) (string, []byte) {
-	location, err := git.FindObject(prefix)
-	git.GotErr(err)
+func (got *Got) ReadObject(prefix string) (string, string, []byte, error) {
+	if is, _ := IsGit(); !is {
+		got.logger.Fatalf("Not a valid git directory\n")
+	}
+	location, err := got.FindObject(prefix)
+	if err != nil {
+		return "", "", nil, err
+	}
+		//get the file name
+	splits := strings.Split(location, "/")
+	f_name := splits[len(splits)-1]
+
 	f, err := os.Open(location)
-	git.GotErr(err)
+	if err != nil {
+		return "", "", nil, err
+	}
 	defer f.Close()
 	rdr, err := zlib.NewReader(f)
-	git.GotErr(err)
+	if err != nil {
+		return "", "", nil, err
+	}
 	//create a buffer to hold the bytes to be read from zlib
 	//buffer implements io.Writer
 	var b bytes.Buffer
 	//to decompress data from zlib, Go is marvelously helpful here, you only have to read from the zlib reader
 	//I use copy here because it is cool and fast
 	_, err = io.Copy(&b, rdr)
-	git.GotErr(err)
+	if err != nil {
+		return "", "", nil, err
+	}
 	//remember that when writing the file, we put in a separator sep to demarcate the header from the body
 	//sep is equal to byte(0)
 	hdr, err := b.ReadBytes(sep)
-	git.GotErr(err)
+	if err != nil {
+		return "", "", nil, err
+	}
 	//the remainder after reading out the header from the buffer, just like were flushing th buffer
 	//we expect nothing else to be in the buffer right now other than the data itself
 	data := b.Bytes()
 	dType, dLen := "", 0
 	_, err = fmt.Sscanf(string(hdr),"%s %d", &dType, &dLen)
-	git.GotErr(err)
-	if len(data) != int(dLen) {
-		git.GotErr(fmt.Errorf("the data is corrupt, specified length foess not match length of data"))
+	if err != nil {
+		return "", "", nil, err
 	}
-	return dType, data
+	if len(data) != int(dLen) {
+		return "", "", nil, fmt.Errorf("the data is corrupt, specified length does not match length of data")
+	}
+	return f_name, dType, data, nil
 }
-//CatFile displays the file info on os.Stdout. It uses flags to determine what it displays
-func (git *Git) CatFile(prefix, mode string) {
-	dType, data := git.readObject(prefix)
+//CatFile displays the file info using the git logger (set as os.Stdout). It uses flags to determine what it displays
+func (got *Got) CatFile(prefix, mode string) {
+	//normalize
+	mode = strings.ToLower(mode)
+	if is, _ := IsGit(); !is {
+		got.logger.Fatalf("Not a valid git directory\n")
+	}
+	f_name, dType, data, err := got.ReadObject(prefix)
+	//this error should just cause th program to exit.
+	got.GotErr(err)
 	switch mode {
 	case "size":
-		git.logger.Printf("File Size: %d\n",len(data))
+		got.logger.Printf("File %s: Size: %d\n",f_name, len(data))
 	case "type":
-		git.logger.Printf("File Type: %s\n", dType)
-	default:
-		git.logger.Printf("File Content: \n%s", string(data))
+		got.logger.Printf("File %s Type: %s\n",f_name, dType)
+	case "pretty":
+		if dType == "commit" || dType == "blob" {
+			got.logger.Printf("Content %s: \n%s", f_name, string(data))	
+		} else if dType == "tree" {
+			//is a directory. ewe need to read th tree before printing
+			got.logger.Printf("Directory: \n")
+			objs := got.deserTree(prefix)
+			for _, obj := range objs {
+				got.CatFile(obj.sha1, "pretty")
+			}
+		}
+	default: 
+		got.logger.Fatalf("Bad file mode. Check again, must be either commit, blob, or tree\n")	
 	}
 }
 
 //write the index file, given a slice of index
 //the gt version of updataindex
-func (git *Git) UpdateIndex(entries []*Index) {
-
+//Index file integers in git are written in NE.
+func (got *Got) UpdateIndex(entries []*Index) {
+	if is, _ := IsGit(); !is {
+		got.logger.Fatalf("Not a valid git directory\n")
+	}
 	var hdr []byte
 	hdr = append(hdr, []byte("DIRC")...)
 	//buf is apparently reusable
 	var buf []byte
-	//TODO: comeback here, this encoding is prolly wrong
 	binary.BigEndian.PutUint32(buf, 2)
 	hdr = append(hdr, buf[:4]...)
-	//is this conversion safe?
+	//use the same buffer, since the buffer does not keep its state. It starts over
 	binary.BigEndian.PutUint32(buf, uint32(len(entries)))
 	hdr = append(hdr, buf[:4]...)
-
 	var data []byte
 	for _, entry := range entries {
 		data = append(data, entry.marshall()...)
 	}
 	allData := bytes.Join([][]byte{hdr, data}, nil)
-	hash := sha1.New()
-	hash.Write(allData)
-	checksum := hash.Sum(nil)
+	checksum := justhash(allData)
 	index := bytes.Join([][]byte{allData, checksum}, nil)
-	err := git.writeToFile(filepath.Join(".git", "index"), index)
+	err := got.writeToFile(filepath.Join(".git", "index"), index)
 	if err != nil {
-		git.GotErr(err)
+		got.GotErr(err)
 	}
 }
 
@@ -207,33 +245,30 @@ func (git *Git) UpdateIndex(entries []*Index) {
 // Extensions. They are identified by signature.
 // 160-bit SHA-1 over the content of the index file before this checksum.
 
-func (git *Git) readIndexFile() []Index {
+func (got *Got) readIndexFile() []Index {
+	if is, _ := IsGit(); !is {
+		got.logger.Fatalf("Not a valid git directory\n")
+	}
 	f, err := os.Open(filepath.Join(".git/index"))
+	got.GotErr(err)
 	data, err := io.ReadAll(f)
-	if err != nil {
-		git.GotErr(err)
-	}
-	hasher := sha1.New()
-	//TODO check this boundary
-
-	_, err = hasher.Write(data[:len(data)-20])
-	if err != nil {
-		git.GotErr(err)
-	}
-	hash := hasher.Sum(nil)
+	got.GotErr(err)
+	hash := justhash(data[:len(data)-20])
 	//the index file has the lst 160 bits (i.e. 20 bytes) as the sha-1 checksum of all the bits tat come before it
 	//we need to ensure that it matches before considering the data valid
 	if bytes.Compare(hash, data[:(len(data)-20)]) != 0 {
-		git.GotErr(errors.New("Checksum is not equal to file digest. File is corrupt"))
+		got.GotErr(errors.New("Checksum is not equal to file digest. File has been tampered with"))
 	}
 	hdr := data[:12]
-	//TODO: look for better ways to do this
-	sign, version, numEntries := string(hdr[:4]), binary.BigEndian.Uint32(hdr[4:8]), binary.BigEndian.Uint32(hdr[8:])
+	sign := string(hdr[:4])
+	version := binary.BigEndian.Uint32(hdr[4:8])
+	numEntries := binary.BigEndian.Uint32(hdr[8:])
+	//we need to check what the header says.
 	if strings.Compare(sign, "DIRC") != 0 {
-		git.GotErr(fmt.Errorf("signature %s is not valid", sign))
+		got.GotErr(fmt.Errorf("signature %s is not valid", sign))
 	}
 	if version != 2 {
-		git.GotErr(fmt.Errorf("Version number must be 2, got %d", version))
+		got.GotErr(fmt.Errorf("Version number must be 2, got %d", version))
 	}
 	//now for the index entries :
 	//we need to use the unix fstat
@@ -241,47 +276,59 @@ func (git *Git) readIndexFile() []Index {
 	indEntries := data[12:(len(data) - 20)]
 	indexes := unmarshal(indEntries)
 	if len(indexes) != int(numEntries) {
-		git.GotErr(fmt.Errorf("Number of enteries does not equal to what the head specified"))
+		got.GotErr(fmt.Errorf("Number of enteries does not equal to what the head specified"))
 	}
 	return indexes
 }
 
-func (git *Git) LsFiles(detail bool) {
-	for _, ind := range git.readIndexFile() {
+func (got *Got) LsFiles(detail bool) {
+	if is, _ := IsGit(); !is {
+		got.logger.Fatalf("Not a valid git directory\n")
+	}
+	for _, ind := range got.readIndexFile() {
 		path := string(ind.path)
 		if detail {
-			//stage number is the 3rd and 4th bit in the 16-bit flag
-			//so we >> by 12 top pos the first three bits on the rightmost
-			//our mask will be 11, i.e. 3, we & against 11 (or 0000000000000011) so that we'll keep only
-			//the values of the last two bits intact, and cancel the third to the last
-			stage := (binary.BigEndian.Uint16(ind.flags[:]) >> 12) & 3
+			//eating the mode and sha1 is easy. As for the mode, we'll octal-format it later with fmt, and the sha too
 			mode := binary.BigEndian.Uint32(ind.mode[:])
-			sha1 := string(ind.sha1_obj_id[:])
+			sha1 := ind.sha1_obj_id[:]
+			//stage number is the 3rd and 4th bit in the 16-bit flag
+			//so first, we >> by 12 top put the first four bits on the rightmost
+			//then, our mask will be 0b00000011, i.e. 3, we & against (or 0000000000000011) so that we'll keep only
+			//the values of the last two bits intact, and cancel every othher before it, namely third and fourth to the last
+			stage := (binary.BigEndian.Uint16(ind.flags[:]) >> 12) & 3
 			s := fmt.Sprintf("Mode: %o sha1: %x  stage: %d path: %s\n", mode, sha1, stage, path)
-			_, err := os.Stdout.WriteString(s)
-			git.GotErr(err)
+			got.logger.Printf(s)
 		} else {
-			_, err := os.Stdout.WriteString(path)
-			git.GotErr(err)
+			got.logger.Printf(path)
 		}
 	}
 }
 
-func (git *Git) get_status() ([]string, []string, map[string]string) {
+//we want to know the file that were changes, the ones that were deleted, and the ones that were added
+func (got *Got) get_status() ([]string, []string, map[string]string) {
+	if is, _ := IsGit(); !is {
+		got.logger.Fatalf("Not a valid git directory\n")
+	}
 	var add, del []string
 	mod := make(map[string]string)
-	//we want to know the file that were changes, the ones that were deleted, and the ones that were added
-	entries, err := os.ReadDir(".")
-		git.GotErr(err)
-	
-	//remove .git
-	for i, entry := range entries {
-		if entry.IsDir() && !(entry.Name() == ".git") {
-			entries = append(entries[:i], entries[i+1:]...)
-		}
-	}
+
+	// Walk directory to fill up entries, but remove .git
+	//TODO: check if this works fine
+	entries := make([]fs.DirEntry, 0)
 	var files []string
-	err = fs.WalkDir(os.DirFS("."), ".", func(path string, d fs.DirEntry, err error) error {
+	fs.WalkDir(os.DirFS("."), ".", func(path string, d fs.DirEntry, err error) error {
+		if d.IsDir() && d.Name() == ".git" {
+			return fs.SkipDir
+		}
+		entries = append(entries, d)
+		if !d.IsDir() {
+			files = append(files, filepath.Clean(path))
+		}
+		return nil
+	})
+
+	
+	err := fs.WalkDir(os.DirFS("."), ".", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return fs.SkipDir
 		}
@@ -293,9 +340,9 @@ func (git *Git) get_status() ([]string, []string, map[string]string) {
 	sort.Slice(files, func(i, j int) bool {
 		return strings.Compare(files[i], files[j]) == -1
 	})
-	git.GotErr(err)
+	got.GotErr(err)
 	
-	index := git.readIndexFile()
+	index := got.readIndexFile()
 	var index_map map[string]Index
 	for _, ind := range index {
 		index_map[string(ind.path)] = ind
@@ -305,11 +352,11 @@ func (git *Git) get_status() ([]string, []string, map[string]string) {
 		for _, f_path := range files {
 			if ind, ok := index_map[f_path]; ok {
 				f, err := os.Open(f_path)
-				git.GotErr(err)
+				got.GotErr(err)
 				cont, err := io.ReadAll(f)
-					git.GotErr(err)
+					got.GotErr(err)
 			
-				if hex.EncodeToString(git.HashObject(cont, "blob", true)) != string(ind.path) {
+				if hex.EncodeToString(got.HashObject(cont, "blob", true)) != string(ind.path) {
 					mod[string(ind.path)] = f_path
 				}
 			}
@@ -340,8 +387,11 @@ func (git *Git) get_status() ([]string, []string, map[string]string) {
 
 	return add, del, mod
 }
-func (git *Git) status() {
-	add, del, mod := git.get_status()
+func (got *Got) status() {
+	if is, _ := IsGit(); !is {
+		got.logger.Fatalf("Not a valid git directory\n")
+	}
+	add, del, mod := got.get_status()
 	var s strings.Builder
 	if len(add) != 0 {
 		s.WriteString(fmt.Sprintf("Added Files: \n%v\n", add))
@@ -355,30 +405,23 @@ func (git *Git) status() {
 		s.WriteString(fmt.Sprintf("%s\n", d))
 	}
 	_, err := fmt.Fprintf(os.Stdout, "%s\n", s.String())
-		git.GotErr(err)
+		got.GotErr(err)
 	
 }
-func (git *Git) writeToFile(path string, b []byte) error {
-	f, err := os.OpenFile(path, os.O_APPEND, 0)
-	defer f.Close()
-		git.GotErr(err)
-	
-	bufWriter := bufio.NewWriter(f)
-	_, err = bufWriter.Write(b)
 
-		git.GotErr(err)
-	return err
-}
 
-func (git *Git) getLocalMAsterHash() string {
+func (got *Got) getLocalMAsterHash() string {
+	if is, _ := IsGit(); !is {
+		got.logger.Fatalf("Not a valid git directory\n")
+	}
 	path := filepath.Join(".git", "refs", "head", "master")
 	f, err := os.Open(path)
-		git.GotErr(err)
+		got.GotErr(err)
 	
 	//Hahaha. I always feel good anytime I'm able to explit Go's interface semantics
 	var s strings.Builder
 	_, err = io.Copy(&s, f)
-		git.GotErr(err)
+		got.GotErr(err)
 	return strings.TrimSpace(s.String())
 }
 
@@ -395,20 +438,20 @@ func SetEnvVars(name, email string) error {
 	return nil
 }
 
-//TODO: Of course I need to read this from a file
-func getEnvs() (name, mail string) {
-	return "", ""
-}
 
 
-func (git *Git) readTree(sha string) ([]Object) {
+func (got *Got) deserTree(sha string) ([]Object) {
+	if is, _ := IsGit(); !is {
+		got.logger.Fatalf("Not a valid git directory\n")
+	}
 	objs := make([]Object, 0)
-	ty, data := git.readObject(sha)
+	_, ty, data, err := got.ReadObject(sha)
+	got.GotErr(err)
 	if ty != "tree" {
-		git.GotErr("should be tree object")
+		got.GotErr("should be tree object")
 	}
 	if len(data) == 0 {
-		git.GotErr("data is empty")
+		got.GotErr("data is empty")
 	}
 	var path, sha1 string
 	start := 0
@@ -420,8 +463,8 @@ func (git *Git) readTree(sha string) ([]Object) {
 		}
 		split := bytes.SplitN(data, []byte(" "), 2)
 		md :=  string(split[0])
-		mode, err := strconv.ParseInt(md, 8, 32)
-		git.GotErr(err)
+		mode, err := strconv.ParseUint(md, 8, 32)
+		got.GotErr(err)
 		sep_pos := bytes.IndexByte(split[1], byte(0))
 		path = string(split[1][:sep_pos])
 		sha1 = string(split[1][sep_pos+1: sep_pos+21])
@@ -433,11 +476,11 @@ func (git *Git) readTree(sha string) ([]Object) {
 }
 
 
-func (git *Git) findTreeObjs(sha1 string) []string {
+func (got *Got) findTreeObjs(sha1 string) []string {
 	var objs []string
-	for _, obj := range git.readTree(sha1) {
+	for _, obj := range got.deserTree(sha1) {
 		if fs.FileMode(obj.mode) == os.ModeDir {
-			objs = append(objs, git.findTreeObjs(obj.sha1)...)
+			objs = append(objs, got.findTreeObjs(obj.sha1)...)
 		} else {
 			objs =append(objs, obj.sha1)
 		}
@@ -447,11 +490,12 @@ func (git *Git) findTreeObjs(sha1 string) []string {
 }
 
 
-func (git *Git) findCommitObjs(sha1 string) []string {
+func (got *Got) findCommitObjs(sha1 string) []string {
 	var objs []string
-	ty, data := git.readObject(sha1)
+	_, ty, data, err := got.ReadObject(sha1)
+	got.GotErr(err)
 	if ty != "commit" {
-		git.GotErr(fmt.Errorf("object is not a commit object"))
+		got.GotErr(fmt.Errorf("object is not a commit object"))
 	}
 	//one tree and 0 or more parents
 	//find tree
@@ -461,25 +505,25 @@ func (git *Git) findCommitObjs(sha1 string) []string {
 	for _, item := range data_s {
 		if strings.HasPrefix(item, "tree") {
 			tree = strings.TrimPrefix(item, "tree ")
-			objs = append(objs, git.findTreeObjs(tree)...)
+			objs = append(objs, got.findTreeObjs(tree)...)
 		} else if strings.HasPrefix(item, "parent") {
 			parents = append(parents, strings.TrimPrefix(item, "parent "))
 		}
 	}
 	if len(parents) != 0 {
 		for _, par := range parents {
-			objs = append(objs, git.findCommitObjs(par)...)
+			objs = append(objs, got.findCommitObjs(par)...)
 		}
 	}
 	return objs
 }
 
-func (git *Git) missingObjs(localSha string, remoteSha string) []string {
-	lo := git.findCommitObjs(localSha)
+func (got *Got) missingObjs(localSha string, remoteSha string) []string {
+	lo := got.findCommitObjs(localSha)
 	if remoteSha == "" {
 		return lo
 	}
-	ro := git.findCommitObjs(remoteSha)
+	ro := got.findCommitObjs(remoteSha)
 	var ret []string
 	ro_all := strings.Join(ro, "")
 	for _, obj := range lo {
@@ -490,12 +534,13 @@ func (git *Git) missingObjs(localSha string, remoteSha string) []string {
 	return ret
 }
 
-func (git *Git) encodePackObjects(sha1 string) []byte {
-	ty, data := git.readObject(sha1)
+func (got *Got) encodePackObjects(sha1 string) []byte {
+	_, ty, data, err := got.ReadObject(sha1)
+	got.GotErr(err)
 	var b bytes.Buffer
 	comp := zlib.NewWriter(&b)
-	_, err := comp.Write(data)
-	git.GotErr(err)
+	_, err = comp.Write(data)
+	got.GotErr(err)
 	data_compressed := b.Bytes()
 
 	ty_num := 0
@@ -506,7 +551,7 @@ func (git *Git) encodePackObjects(sha1 string) []byte {
 	default: 
 	}
 	if ty_num == 0 {
-		git.GotErr(errors.New("wrong boject type"))
+		got.GotErr(errors.New("wrong boject type"))
 	}
 	size := len(data)
 	by := (ty_num << 4) | (size & 0x0f)
@@ -527,7 +572,7 @@ func (git *Git) encodePackObjects(sha1 string) []byte {
 }
 
 
-func (git *Git) createPack(objs []string) []byte {
+func (got *Got) createPack(objs []string) []byte {
 	//var b bytes.Buffer
 	var b []byte
 	b =  append(b, []byte("PACK")...)
@@ -538,7 +583,7 @@ func (git *Git) createPack(objs []string) []byte {
 	b = append(b, buf...)
 	sort.Slice(objs, func(i, j int) bool {return strings.Compare(objs[i], objs[j]) == -1})
 	for _, obj := range objs {
-		b = append(b, git.encodePackObjects(obj)...)
+		b = append(b, got.encodePackObjects(obj)...)
 	} 
 	sha1 := justhash(b)
 	b = append(b, sha1...)

@@ -1,5 +1,5 @@
 /*
-Copyright © 2021 NAME HERE <EMAIL ADDRESS>
+Copyright © 2021 Oluwamuyiwa Onigbinde <onigbindemy@gmail.com>
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,7 +26,7 @@ var pushCmd = &cobra.Command{
 	Short: "pushes changes to a remote repository",
 	Long:  `pushes changes to a remote repository`,
 	Run: func(cmd *cobra.Command, args []string) {
-		git := internal.Git{}
+		git := internal.NewGot()
 		git.Push(args[0])
 	},
 }

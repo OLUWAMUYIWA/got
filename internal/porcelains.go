@@ -14,68 +14,70 @@ import (
 
 //TODO: use sep in place of all zero-yte separators
 var sep byte = 0
-
+//Time format used in formatting commit time
 const TIME_FORMAT = "Mon Jan 2 15:04:05 2006 -0700"
 
 //#####PORCELAINS#####
-//Porcelains are generally small and neat methods that rely heavily on plumbers to do the dirty work.
+//Porcelains are generally small and neat methods that rely heavily on plumbers to do the dirty work, and sometimes helprs too.
 //Its an unfair world, but it is what it is
 
 //Init creates a directory for your repo and initializes the hidden .git directory
-func (git *Git) Init(name string) {
+func (got *Got) Init(name string) {
 
-	if err := os.Mkdir(name, 0); err != nil {
-		git.GotErr(err)
+	if err := os.Mkdir(name, os.ModeDir); err != nil {
+		got.GotErr(err)
 	}
 	//MkdirAll is just perfect because it creates directories on all the paths
-	if err := os.MkdirAll(filepath.Join(name, ".git"), 0); err != nil {
-		git.GotErr(err)
+	l := filepath.Join(name, ".git")
+	fmt.Println(l)
+	if err := os.MkdirAll(filepath.Join(name, ".git"), os.ModeDir); err != nil {
+		got.GotErr(err)
 	}
-	if err := os.MkdirAll(filepath.Join(name, "objects"), 0); err != nil {
-		git.GotErr(err)
+	if err := os.MkdirAll(filepath.Join(name, ".git", "objects"), os.ModeDir); err != nil {
+		got.GotErr(err)
 	}
-	if err := os.MkdirAll(filepath.Join(name, "refs", "heads"), 0); err != nil {
-		git.GotErr(err)
+	if err := os.MkdirAll(filepath.Join(name, ".git", "refs", "heads"), os.ModeDir); err != nil {
+		got.GotErr(err)
 	}
 	//we create the HEAD file, a pointer to the current branch
 	headPath := filepath.Join(name, ".git", "HEAD")
 	if _, err := os.Create(headPath); err != nil {
-		git.GotErr(err)
+		got.GotErr(err)
 	}
-	//init with te ref at  master
-	git.writeToFile(headPath, []byte("ref: refs/heads/master"))
-	git.logger.Printf("Initialized Empty Repository: %s \n", name)
+	//init with the ref at  master
+	got.writeToFile(headPath, []byte("ref: refs/heads/master"))
+	got.logger.Printf("Initialized Empty Repository: %s \n", name)
 }
 
-func (git *Git) Status() {
-	added, modified, deleted := git.get_status()
-	out := os.Stdout
+func (got *Got) Status() {
+	if is, _ := IsGit(); !is {
+		got.logger.Fatalf("Not a valid git directory\n")
+	}
+	added, modified, deleted := got.get_status()
 	if len(added) != 0 {
-		_, err := fmt.Fprintf(out, "New files (untracked): %v\n To track run 'git add <filenale>'\n", added)
-			git.GotErr(err)
+		_, err := fmt.Fprintf(got.logger.Writer(), "New files (untracked): %v\n To track run 'git add <filenale>'\n", added)
+			got.GotErr(err)
 	}
 	if len(modified) != 0 {
-		_, err := fmt.Fprintf(out, "Modified files: %v\n To stage changes 'git add <filenale>'\n", modified)
-			git.GotErr(err)
+		_, err := fmt.Fprintf(got.logger.Writer(), "Modified files: %v\n To stage changes 'git add <filenale>'\n", modified)
+			got.GotErr(err)
 	}
 	if len(deleted) != 0 {
-		_, err := fmt.Fprintf(out, "Deleted files: %v\n", deleted)
-			git.GotErr(err)
+		_, err := fmt.Fprintf(got.logger.Writer(), "Deleted files: %v\n", deleted)
+			got.GotErr(err)
 	}
 }
 
-//i must use a library to pretty_print/highlight the changed parts of files here
-//should I write a simple
-func (git *Git) Diff() {
 
-}
-
-func (git *Git) Add(paths []string) {
-	r := strings.NewReplacer("\\", "/")
+func (got *Got) Add(paths []string) {
+	if is, _ := IsGit(); !is {
+		got.logger.Fatalf("Not a valid git directory\n")
+	}
+	r := strings.NewReplacer("\\", "/")	
 	for i, path := range paths {
 		paths[i] = r.Replace(path)
 	}
-	indexes := git.readIndexFile()
+	indexes := got.readIndexFile()
 	//Go, unlike Rust does not have iterators. Shit!
 	var news []FPath
 	//couldn't quickly of amuch better way of comparing these two
@@ -91,11 +93,11 @@ func (git *Git) Add(paths []string) {
 	}
 	var new_inds []*Index
 	for _, new := range news {
-		ind := git.newIndex(string(new))
+		ind := got.newIndex(string(new))
 		new_inds = append(new_inds, ind)
 	}
 	if len(new_inds) != 0 {
-		git.UpdateIndex(new_inds)
+		got.UpdateIndex(new_inds)
 	} else {
 		fmt.Fprintf(os.Stdout, "No file to be added")
 	}
@@ -103,16 +105,19 @@ func (git *Git) Add(paths []string) {
 
 //to write a tree, we need to stage the files first, then from the indexed files, we write the tree
 //TODO: for now, we support only root-level files
-func (git *Git) WriteTree() string {
+func (got *Got) WriteTree() string {
+	if is, _ := IsGit(); !is {
+		got.logger.Fatalf("Not a valid git directory\n")
+	}
 	// we need the mode, the path from root, and the sha1
-	indexes := git.readIndexFile()
+	indexes := got.readIndexFile()
 	var b bytes.Buffer
 	for _, ind := range indexes {
 		mode := binary.LittleEndian.Uint32(ind.mode[:])
 		s := fmt.Sprintf("%o %s%v%x", mode, ind.path, sep, ind.sha1_obj_id)
 		b.Write([]byte(s))
 	}
-	hash := git.HashObject(b.Bytes(), "tree", true)
+	hash := got.HashObject(b.Bytes(), "tree", true)
 	hash_s := hex.EncodeToString(hash)
 	return hash_s
 }
@@ -120,10 +125,16 @@ func (git *Git) WriteTree() string {
 //https://github.com/git/git/blob/master/Documentation/technical/http-protocol.txt
 //https://github.com/git/git/blob/master/Documentation/technical/pack-protocol.txt
 
-func (git *Git) Commit(msg string) string {
-	tree := git.WriteTree()
-	parent := git.getLocalMAsterHash()
-	uname, email := getEnvs()
+func (got *Got) Commit(msg string) string {
+	if is, _ := IsGit(); !is {
+		got.logger.Fatalf("Not a valid git directory\n")
+	}
+	tree := got.WriteTree()
+	parent := got.getLocalMAsterHash()
+	uname, email, err := getConfig()
+	if err != nil {
+		got.logger.Fatalf("during commit: %s \n", err)
+	}
 	author := fmt.Sprintf("%s <%s>", uname, email)
 	//TODO check if formatting is correct
 	t := time.Now()
@@ -136,19 +147,21 @@ func (git *Git) Commit(msg string) string {
 	s.WriteString(fmt.Sprintln())
 	s.WriteString(msg)
 	s.WriteString(fmt.Sprintln())
-	sha1 := git.HashObject([]byte(s.String()), "commit", true)
+	sha1 := got.HashObject([]byte(s.String()), "commit", true)
 	sha1_s := fmt.Sprintf("%x", sha1)
 	path := filepath.Join(".git", "refs", "head", "master")
 	//write the commit to refs/master
 	f, err := os.OpenFile(path, os.O_RDWR|os.O_APPEND, 0)
-		git.GotErr(err)
+		got.GotErr(err)
 	buf_f := bufio.NewWriter(f)
 	_, err = buf_f.WriteString(sha1_s)
-		git.GotErr(err)
+		got.GotErr(err)
 	os.Stdout.WriteString("Commit succeded")
 	return sha1_s
 }
 
-func (git *Git) Push(url string) {
-
+func (got *Got) Push(url string) {
+if is, _ := IsGit(); !is {
+		got.logger.Fatalf("Not a valid git directory\n")
+	}
 }

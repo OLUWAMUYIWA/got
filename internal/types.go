@@ -14,15 +14,15 @@ import (
 )
 
 /// |||GIT struct||| ////
-type Git struct{
+type Got struct{
 	logger log.Logger
 }
 
 
-func NewGit() *Git {
+func NewGot() *Got {
 	logger := log.New(os.Stdout, "GOT: ", log.Default().Flags())
 	logger.Printf("Got: ")
-	return &Git{logger: *logger}
+	return &Got{logger: *logger}
 }
 // func NewGit() *Git {
 // 	//TODO: before init, wkdir is the enclosing dir. After init. Think about this later, prolly no point for the git struct
@@ -74,7 +74,7 @@ func (e *OpErr)addContext(s string) *OpErr {
 /// |||The Git struct error handler |||| ///
 //TODO: Do better error handling here
 //GotErr is a convenience function for errors that will cause the program to exit
-func (git *Git)GotErr(msg interface{}) {
+func (git *Got)GotErr(msg interface{}) {
 	if msg != nil {
 		git.logger.Fatalf("got err: %v", msg)
 		os.Exit(1)
@@ -100,17 +100,17 @@ type Index struct {
 	path []byte
 }
 
-func (git *Git) newIndex(path string) *Index {
+func (got *Got) newIndex(path string) *Index {
 	f, err := os.Open(string(path))
 	if err != nil {
-		git.GotErr(err)
+		got.GotErr(err)
 	}
 	blob, err := io.ReadAll(bufio.NewReader(f))
-	sha1 := git.HashObject(blob, "blob", true)
+	sha1 := got.HashObject(blob, "blob", true)
 	var stat unix.Stat_t
 	err = unix.Stat(path, &stat)
 	if err != nil {
-		git.GotErr(err)
+		got.GotErr(err)
 	}
 	i := mapStatToIndex(&stat, sha1)
 	i.flags = setUpFlags(path)
@@ -190,7 +190,9 @@ func (i *Index) Read(b []byte) (int, error) {
 	return n, nil
 }
 
+//marshall an index into bytes
 func (i *Index) marshall() []byte {
+	//I see no poit catching errors, these ops are not I/O. Only cpu failure here, I think
 	var b bytes.Buffer
 	b.Write(i.ctime_s[:])
 	b.Write(i.ctime_ns[:])
@@ -205,21 +207,21 @@ func (i *Index) marshall() []byte {
 	b.Write(i.sha1_obj_id[:])
 	b.Write(i.flags[:])
 	//b.Write(i.ver[:])
-	//path is not fixed
 	pathlen := len(i.path)
-	//data b4 path = 64 bytes. Doing this transformation is a way of appendin the path and still getting a multiple of 8
+	//data b4 path = 62 bytes. Doing this transformation is a way of appendin the path and still getting a multiple of 8
+	//this is how we do the padding
 	datalen := int(math.Ceil(float64(b.Len()+pathlen+8)/8) * 8)
 	fill := datalen - (b.Len() + pathlen)
 	b.Write(i.path)
-	//TODO: Not sure this works
+	//Fill it with zero bytes
 	space_fill := bytes.Repeat([]byte{byte(0)}, fill)
-	//fill_bytes := make([]byte, fill, fill)
 	b.Write(space_fill)
 	return b.Bytes()
 }
-func destructureIndex(b []byte) Index {
+func destructureIntoIndex(b []byte) Index {
 	var i Index
 	start, lim := 0, 4
+	//closure crunches the four-byters 
 	get_next_four := func(b []byte) [4]byte {
 		var arr [4]byte
 		for i, pos := start, 0; i < lim; i, pos = i+1, pos+1 {
@@ -239,38 +241,37 @@ func destructureIndex(b []byte) Index {
 	i.gid = get_next_four(b)
 	i.f_size = get_next_four(b)
 	//now to the sha-1
+	//lim is 4 bytes ahead of start, we want it to be 20 because of sha1
 	lim += 16
 	get_next_twenty := func(b []byte) [20]byte {
 		var arr [20]byte
 		for i, pos := start, 0; i < lim; i, pos = i+1, pos+1 {
 			arr[pos] = b[i]
 		}
+		//this op levels the gap. both start and op are at the same position now
 		start, lim = start+20, lim+16
 		return arr
 	}
 	i.sha1_obj_id = get_next_twenty(b)
-	//now start and lim are th the same number
+	//now start and lim are th the same number, but incr lim by two
 	lim += 2
 	get_next_two := func(b []byte) [2]byte {
 		var arr [2]byte
 		for i, pos := start, 0; i < lim; i, pos = i+1, pos+1 {
 			arr[pos] = b[i]
 		}
-		start, lim = start+2, lim+2
+		start = start+2
 		return arr
 	}
 	i.flags = get_next_two(b)
-	//i.ver = get_next_two(b)
-	//the remainder is the path
-	//TODO: check again
-	pos := bytes.IndexByte(b[:lim], byte(0))
-	i.path = b[lim:pos]
+	i.path = b[lim:]
 
 	return i
 }
 func unmarshal(data []byte) []Index {
 	//length of deterministic bytes = 64
 	var indexEntries []Index
+	//here, I chose to use a bufio Scanner, because it makes reading the bytes easier. I could just set a custom scanner split func
 	bufData := bytes.NewReader(data)
 	scanner := bufio.NewScanner(bufData)
 	//TODO: this scan func needs to be revisited
@@ -278,29 +279,36 @@ func unmarshal(data []byte) []Index {
 		if atEOF && len(data) == 0 {
 			return 0, nil, nil
 		}
-		det := data[0:64]
+		//the pre-path length is 64 bytes
+		det := data[0:62]
+		//put that in first
 		token = append(token, det...)
-		i := bytes.IndexByte(data[64:], byte(0))
+		//now we deal with the path
+		//remeber we filled the remaining bytes with zero bytes just after the path
+		//and remember that paths are string files, text, more precicely. They could never have zero bytes
+		//so it is safe to assume that the first instance of byte(0) signifies the end of the path 
+		i := bytes.IndexByte(data[62:], byte(0))
 		if i >= 0 {
+			//clean
 			path := data[64:i]
 			token = append(token, path...)
 		}
-		advance = 64 + i
+		advance = int(math.Ceil(float64(len(token)+8)/8) * 8)
 		err = nil
 		return
 	}
 	scanner.Split(split)
 	for scanner.Scan() {
 		entry := scanner.Bytes()
-		indexEntries = append(indexEntries, destructureIndex(entry))
+		indexEntries = append(indexEntries, destructureIntoIndex(entry))
 	}
 	return indexEntries
 }
 
 
-//Objeect is a composite datatype representing any of the three types in the git obects directory: blobs, trees, commits 
+//Object is a composite datatype representing any of the three types in the git obects directory: blobs, trees, commits 
 type Object struct {
-	mode int64
+	mode uint64
 	path string
 	sha1 string
 }
