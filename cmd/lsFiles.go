@@ -24,13 +24,12 @@ import (
 var lsFilesCmd = &cobra.Command{
 	Use:   "ls-files",
 	Short: "List files",
-	//TODO
-	Long: `
+	Long: ` It displays the mode sha1, path and type of object files to stdout 
 	`,
 	Run: func(cmd *cobra.Command, args []string) {
-		git := internal.NewGit()
+		got := internal.NewGot()
 		det, _ := cmd.Flags().GetBool("details")
-		git.LsFiles(det)
+		got.LsFiles(det)
 	},
 }
 

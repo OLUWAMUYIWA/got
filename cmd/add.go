@@ -26,8 +26,8 @@ var addCmd = &cobra.Command{
 	Short: "Adds a series of files to be staged for commit",
 	Long:  `Adds a series of files to be staged for commit.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		git := internal.Git{}
-		git.Add(args)
+		got := internal.NewGot()
+		got.Add(args)
 	},
 }
 

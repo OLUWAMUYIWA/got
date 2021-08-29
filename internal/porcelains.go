@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-//TODO: use sep in place of all zero-yte separators
+//we use sep in place of all zero-byte separators
 var sep byte = 0
 //Time format used in formatting commit time
 const TIME_FORMAT = "Mon Jan 2 15:04:05 2006 -0700"
@@ -117,7 +117,7 @@ func (got *Got) WriteTree() string {
 		s := fmt.Sprintf("%o %s%v%x", mode, ind.path, sep, ind.sha1_obj_id)
 		b.Write([]byte(s))
 	}
-	hash := got.HashObject(b.Bytes(), "tree", true)
+	hash := got.HashObject(b.Bytes(), "tree")
 	hash_s := hex.EncodeToString(hash)
 	return hash_s
 }
@@ -147,7 +147,7 @@ func (got *Got) Commit(msg string) string {
 	s.WriteString(fmt.Sprintln())
 	s.WriteString(msg)
 	s.WriteString(fmt.Sprintln())
-	sha1 := got.HashObject([]byte(s.String()), "commit", true)
+	sha1 := got.HashObject([]byte(s.String()), "commit")
 	sha1_s := fmt.Sprintf("%x", sha1)
 	path := filepath.Join(".git", "refs", "head", "master")
 	//write the commit to refs/master

@@ -2,7 +2,6 @@ package internal
 
 import (
 	"bytes"
-	"compress/zlib"
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
@@ -48,7 +47,7 @@ func Config(conf ConfigObject) error {
 //HashObject returns the hash of the file it hashes
 //plumber + helper function
 //needed for blobs, trees, and commit hashes
-func (got *Got) HashObject(data []byte, ty string, shouldwrite bool) []byte {
+func (got *Got) HashObject(data []byte, ty string) []byte {
 	base, err := os.Getwd()
 	if err != nil {
 		got.GotErr(err)
@@ -71,18 +70,17 @@ func (got *Got) HashObject(data []byte, ty string, shouldwrite bool) []byte {
 	//first two characters (1 byte) are the name of the directory. The remaining 38 (19 bytes) are the  name of the file
 	//that contains the compressed version of the blob.
 	//remember that sha1 produces a 20-byte hash (160 bits, or 40 hex characters)
-	if shouldwrite {
-		path := filepath.Join(base, ".git/objects/", hash_str[:2])
-		err = os.MkdirAll(path, os.ModeDir)
-		got.GotErr(err)
-		fPath := filepath.Join(path, hash_str[2:])
-		f, err := os.Create(fPath)
-		got.GotErr(err)
-		defer f.Close()
-		//the actual file is then compressed and stored in the file created
-		err = compress(f, b)
-		got.GotErr(err)
-	}
+	path := filepath.Join(base, ".git/objects/", hash_str[:2])
+	err = os.MkdirAll(path, os.ModeDir)
+	got.GotErr(err)
+	fPath := filepath.Join(path, hash_str[2:])
+	f, err := os.Create(fPath)
+	got.GotErr(err)
+	defer f.Close()
+	//the actual file is then compressed and stored in the file created
+	err = compress(f, b)
+	got.GotErr(err)
+
 	return raw
 }
 
@@ -146,16 +144,10 @@ func (got *Got) ReadObject(prefix string) (string, string, []byte, error) {
 		return "", "", nil, err
 	}
 	defer f.Close()
-	rdr, err := zlib.NewReader(f)
-	if err != nil {
-		return "", "", nil, err
-	}
 	//create a buffer to hold the bytes to be read from zlib
 	//buffer implements io.Writer
 	var b bytes.Buffer
-	//to decompress data from zlib, Go is marvelously helpful here, you only have to read from the zlib reader
-	//I use copy here because it is cool and fast
-	_, err = io.Copy(&b, rdr)
+	uncompress(f, &b)
 	if err != nil {
 		return "", "", nil, err
 	}
@@ -356,7 +348,7 @@ func (got *Got) get_status() ([]string, []string, map[string]string) {
 				cont, err := io.ReadAll(f)
 					got.GotErr(err)
 			
-				if hex.EncodeToString(got.HashObject(cont, "blob", true)) != string(ind.path) {
+				if hex.EncodeToString(got.HashObject(cont, "blob")) != string(ind.path) {
 					mod[string(ind.path)] = f_path
 				}
 			}
@@ -456,19 +448,18 @@ func (got *Got) deserTree(sha string) ([]Object) {
 	var path, sha1 string
 	start := 0
 	for {
-		//TODO: is this the outher slice reassigned or just the slice i just finished working with in th last iter?
-		data = data[start:]
+		d := data[start:]
 		if len(data) == 0 {
 			break
 		}
-		split := bytes.SplitN(data, []byte(" "), 2)
+		split := bytes.SplitN(d, []byte(" "), 2)
 		md :=  string(split[0])
 		mode, err := strconv.ParseUint(md, 8, 32)
 		got.GotErr(err)
-		sep_pos := bytes.IndexByte(split[1], byte(0))
+		sep_pos := bytes.IndexByte(split[1], sep)
 		path = string(split[1][:sep_pos])
 		sha1 = string(split[1][sep_pos+1: sep_pos+21])
-		start += len(md) + len(path) + len(sha1)
+		start += len(split[0]) + 1 + sep_pos+1 + 20
 		objs = append(objs, Object{mode, path, sha1})
 	}
 	
@@ -538,9 +529,10 @@ func (got *Got) encodePackObjects(sha1 string) []byte {
 	_, ty, data, err := got.ReadObject(sha1)
 	got.GotErr(err)
 	var b bytes.Buffer
-	comp := zlib.NewWriter(&b)
-	_, err = comp.Write(data)
-	got.GotErr(err)
+	err = compress(&b, data)
+	if err != nil {
+		got.GotErr(err)
+	}
 	data_compressed := b.Bytes()
 
 	ty_num := 0

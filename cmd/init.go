@@ -24,11 +24,10 @@ import (
 var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Initializes the repository",
-	//TODO
 	Long: `Initializes the repository`,
 	Run: func(cmd *cobra.Command, args []string) {
-		git := internal.NewGit()
-		git.Init(args[0])
+		got := internal.NewGot()
+		got.Init(args[0])
 	},
 }
 

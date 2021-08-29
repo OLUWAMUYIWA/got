@@ -16,6 +16,9 @@ limitations under the License.
 package cmd
 
 import (
+	"fmt"
+	"os"
+
 	"github.com/OLUWAMUYIWA/got/internal"
 	"github.com/spf13/cobra"
 )
@@ -27,10 +30,13 @@ var catFileCmd = &cobra.Command{
 	Long: `displays the content of a file,
 	given te name as poditional arguments `,
 	Run: func(cmd *cobra.Command, args []string) {
-		git := internal.Git{}
+		got := internal.NewGot()
 		mode, err := cmd.Flags().GetString("mode")
-		git.GotErr(err)
-		git.CatFile(args[0], mode)
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+		got.CatFile(args[0], mode)
 	},
 }
 

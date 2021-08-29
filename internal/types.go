@@ -24,19 +24,6 @@ func NewGot() *Got {
 	logger.Printf("Got: ")
 	return &Got{logger: *logger}
 }
-// func NewGit() *Git {
-// 	//TODO: before init, wkdir is the enclosing dir. After init. Think about this later, prolly no point for the git struct
-// 	//BUG there has to be a way to update wkdir to the git repo itself if i'm to keep it. And obviously for every cli command,
-// 	//I have to init the git struct as clis are stateless.
-// 	basedir, err := os.Getwd()
-// 	if err != nil {
-// 		GotErr(err)
-// 	}
-// 	return &Git{
-// 		wkdir: basedir,
-// 	}
-// }
-
 
 //TODO: replace all path strings with this. better to alias, they all look silly as strings
 type FPath string
@@ -71,8 +58,7 @@ func (e *OpErr)addContext(s string) *OpErr {
 	return &newErr
 }
 
-/// |||The Git struct error handler |||| ///
-//TODO: Do better error handling here
+/// |||The Got struct error handler |||| ///
 //GotErr is a convenience function for errors that will cause the program to exit
 func (git *Got)GotErr(msg interface{}) {
 	if msg != nil {
@@ -106,21 +92,19 @@ func (got *Got) newIndex(path string) *Index {
 		got.GotErr(err)
 	}
 	blob, err := io.ReadAll(bufio.NewReader(f))
-	sha1 := got.HashObject(blob, "blob", true)
+	sha1 := got.HashObject(blob, "blob")
 	var stat unix.Stat_t
 	err = unix.Stat(path, &stat)
 	if err != nil {
 		got.GotErr(err)
 	}
-	i := mapStatToIndex(&stat, sha1)
+	i := mapStatToIndex(&stat, sha1, path)
 	i.flags = setUpFlags(path)
-	//TODO: path
 	i.path = []byte(path)
 	return i
 }
 
-//TODO: This does not even make any sense yet
-func mapStatToIndex(stat *unix.Stat_t, sha1 []byte) *Index {
+func mapStatToIndex(stat *unix.Stat_t, sha1 []byte, path string) *Index {
 	var i Index
 	i.ctime_s = mapint64ToBytes(stat.Ctim.Sec)
 	i.ctime_ns = mapint64ToBytes(stat.Ctim.Nsec)
@@ -137,12 +121,13 @@ func mapStatToIndex(stat *unix.Stat_t, sha1 []byte) *Index {
 	i.gid = mapint64ToBytes(int64(stat.Gid))
 	i.f_size = mapint64ToBytes(int64(stat.Size))
 	i.sha1_obj_id = shaToBytes(sha1)
-	//TODO remaining
+	i.flags = setUpFlags(path)
 	return &i
 }
 
 //1-bit assume-valid flag (false); 1-bit extended flag (must be zero in version 2); 2-bit stage (during merge);
 //12-bit name length if the length is less than 0xFFF, otherwise 0xFFF is stored in this field.
+//TODO: check
 //The value is 9 in decimal, or 0x9.
 func setUpFlags(name string) [2]byte {
 	i := int16(0)
@@ -214,7 +199,7 @@ func (i *Index) marshall() []byte {
 	fill := datalen - (b.Len() + pathlen)
 	b.Write(i.path)
 	//Fill it with zero bytes
-	space_fill := bytes.Repeat([]byte{byte(0)}, fill)
+	space_fill := bytes.Repeat([]byte{sep}, fill)
 	b.Write(space_fill)
 	return b.Bytes()
 }
@@ -274,7 +259,6 @@ func unmarshal(data []byte) []Index {
 	//here, I chose to use a bufio Scanner, because it makes reading the bytes easier. I could just set a custom scanner split func
 	bufData := bytes.NewReader(data)
 	scanner := bufio.NewScanner(bufData)
-	//TODO: this scan func needs to be revisited
 	split := func(data []byte, atEOF bool) (advance int, token []byte, err error) {
 		if atEOF && len(data) == 0 {
 			return 0, nil, nil
@@ -287,7 +271,7 @@ func unmarshal(data []byte) []Index {
 		//remeber we filled the remaining bytes with zero bytes just after the path
 		//and remember that paths are string files, text, more precicely. They could never have zero bytes
 		//so it is safe to assume that the first instance of byte(0) signifies the end of the path 
-		i := bytes.IndexByte(data[62:], byte(0))
+		i := bytes.IndexByte(data[62:], sep)
 		if i >= 0 {
 			//clean
 			path := data[64:i]

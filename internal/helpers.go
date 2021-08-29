@@ -34,7 +34,9 @@ func HashFile(name string, ty string, w, std bool) error {
 	var err error
 	if std {
 		b, err = io.ReadAll(os.Stdin)
-		return CopyErr.addContext(err.Error())
+		if err != nil {
+			return CopyErr.addContext(err.Error())
+		}
 	} else {
 		f, err := os.Open(name)
 		if err != nil {
@@ -48,7 +50,12 @@ func HashFile(name string, ty string, w, std bool) error {
 		b = bread.Bytes()
 	}
 	got := NewGot()
-	h := got.HashObject(b, ty, std)
+	var h []byte
+	if w {
+		h = got.HashObject(b, ty)	
+	} else {
+		h = justhash(b)
+	}
 	if _, err := fmt.Fprintf(os.Stdout, "%x", h); err != nil {
 		return IOWriteErr.addContext(err.Error())
 	}
@@ -113,6 +120,20 @@ func compress(writer io.Writer, data []byte) error {
 	err = comp.Flush()
 	if err != nil {
 		return IOWriteErr.addContext(err.Error())
+	}
+	return nil
+}
+
+
+func uncompress(rdr io.Reader, dst io.Writer) error {
+	comp, err := zlib.NewReader(rdr)
+	if err != nil {
+		return err
+	}
+	//to decompress data from zlib, Go is marvelously helpful here, you only have to read from the zlib reader
+	//I use copy here because it is cool and fast
+	if _,err := io.Copy(dst, comp); err != nil {
+		return err
 	}
 	return nil
 }
