@@ -107,8 +107,9 @@ func (got *Got) FindObject(prefix string) (string, error) {
 	location := ""
 	//we also need to be sure that our given prefix is unique too. If it isn't we may be return ing the wrong file
 	num := 0
+
 	for _, entry := range entries {
-		if entry.Type().IsRegular() && entry.Name() == prefix[:2] {
+		if entry.Type().IsRegular() && strings.HasPrefix(entry.Name(), prefix[2:]){
 			num += 1
 			location = entry.Name()
 			if num > 1 {
@@ -117,7 +118,7 @@ func (got *Got) FindObject(prefix string) (string, error) {
 		}
 	}
 	if len(location) != 0 {
-		return filepath.Join(".git/object", location), nil
+		return filepath.Join(".git/objects", prefix[:2], location), nil
 	} else {
 		return "", fmt.Errorf("%s matches no blob", prefix)
 	}
@@ -178,7 +179,7 @@ func (got *Got) CatFile(prefix, mode string) {
 		got.logger.Fatalf("Not a valid git directory\n")
 	}
 	f_name, dType, data, err := got.ReadObject(prefix)
-	//this error should just cause th program to exit.
+	//this error should just cause the program to exit.
 	got.GotErr(err)
 	switch mode {
 	case "size":
@@ -197,7 +198,7 @@ func (got *Got) CatFile(prefix, mode string) {
 			}
 		}
 	default: 
-		got.logger.Fatalf("Bad file mode. Check again, must be either commit, blob, or tree\n")	
+		got.logger.Fatalf("Bad flag mode. Check again, must be either size, type, pretty \n")	
 	}
 }
 
