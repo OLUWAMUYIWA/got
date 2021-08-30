@@ -1,7 +1,7 @@
 # got
 a minimal git client in go
 
-In implementing this client, I used only the Go standard library.
+In implementing this client, I used only one external package.
 I'm a Go developer interested in learning how things work at the lower level.
 I'm especially interested in network protocols and distributed systems. 
 If you're looking at this anywhere in the world, please check the code out and see if 
