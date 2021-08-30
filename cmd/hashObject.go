@@ -44,15 +44,15 @@ Thye should be one of:
 			os.Exit(1)
 		}
 		if std {
-			internal.HashFile("", args[1], write, std)
+			internal.HashFile("", write, std)
 		} else {
-			internal.HashFile(args[0], args[1], write, std)
+			internal.HashFile(args[0], write, std)
 		}
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(hashObjectCmd)
-	hashObjectCmd.Flags().BoolP("stdin", "std", false, "should I get the content from stdin?")
+	hashObjectCmd.Flags().BoolP("stdin", "s", false, "should I get the content from stdin?")
 	hashObjectCmd.Flags().BoolP("write", "w", false, "write to the object directory?")
 }

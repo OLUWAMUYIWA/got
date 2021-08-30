@@ -29,7 +29,7 @@ func IsGit() (bool, error) {
 	return false, OpenErr
 }
 
-func HashFile(name string, ty string, w, std bool) error {
+func HashFile(name string, w, std bool) error {
 	var b []byte
 	var err error
 	if std {
@@ -52,7 +52,7 @@ func HashFile(name string, ty string, w, std bool) error {
 	got := NewGot()
 	var h []byte
 	if w {
-		h = got.HashObject(b, ty)	
+		h = got.HashObject(b, "blob")	
 	} else {
 		h = justhash(b)
 	}

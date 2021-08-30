@@ -27,7 +27,7 @@ var commitCmd = &cobra.Command{
 	Long:  `makes a commit to the local git.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		msg, _ := cmd.Flags().GetString("msg")
-		git := internal.NewGit()
+		git := internal.NewGot()
 		git.Commit(msg)
 	},
 }

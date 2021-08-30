@@ -71,7 +71,7 @@ func (got *Got) HashObject(data []byte, ty string) []byte {
 	//that contains the compressed version of the blob.
 	//remember that sha1 produces a 20-byte hash (160 bits, or 40 hex characters)
 	path := filepath.Join(base, ".git/objects/", hash_str[:2])
-	err = os.MkdirAll(path, os.ModeDir)
+	err = os.MkdirAll(path, 0777)
 	got.GotErr(err)
 	fPath := filepath.Join(path, hash_str[2:])
 	f, err := os.Create(fPath)

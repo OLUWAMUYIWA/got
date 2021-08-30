@@ -20,23 +20,23 @@ const TIME_FORMAT = "Mon Jan 2 15:04:05 2006 -0700"
 //#####PORCELAINS#####
 //Porcelains are generally small and neat methods that rely heavily on plumbers to do the dirty work, and sometimes helprs too.
 //Its an unfair world, but it is what it is
-
+//Check: https://stackoverflow.com/questions/35894613/how-to-disallow-access-to-a-file-for-one-user/35895436#35895436 on file permissions
 //Init creates a directory for your repo and initializes the hidden .git directory
 func (got *Got) Init(name string) {
 
-	if err := os.Mkdir(name, os.ModeDir); err != nil {
+	if err := os.Mkdir(name, 0777); err != nil {
 		got.GotErr(err)
 	}
 	//MkdirAll is just perfect because it creates directories on all the paths
 	l := filepath.Join(name, ".git")
 	fmt.Println(l)
-	if err := os.MkdirAll(filepath.Join(name, ".git"), os.ModeDir); err != nil {
+	if err := os.MkdirAll(filepath.Join(name, ".git"), 0777); err != nil {
 		got.GotErr(err)
 	}
-	if err := os.MkdirAll(filepath.Join(name, ".git", "objects"), os.ModeDir); err != nil {
+	if err := os.MkdirAll(filepath.Join(name, ".git", "objects"), 0777); err != nil {
 		got.GotErr(err)
 	}
-	if err := os.MkdirAll(filepath.Join(name, ".git", "refs", "heads"), os.ModeDir); err != nil {
+	if err := os.MkdirAll(filepath.Join(name, ".git", "refs", "heads"), 0777); err != nil {
 		got.GotErr(err)
 	}
 	//we create the HEAD file, a pointer to the current branch
