@@ -243,7 +243,15 @@ func (got *Got) readIndexFile() []Index {
 		got.logger.Fatalf("Not a valid git directory\n")
 	}
 	f, err := os.Open(filepath.Join(".git/index"))
-	got.GotErr(err)
+	p_err, ok := err.(*os.PathError)
+	if ok {
+		temp_err := errors.New("no such file or directory")
+		if p_err.Unwrap() == temp_err {
+			got.logger.Fatalf("You have not indexed any file\n")
+		}
+	} else {
+		got.GotErr(err)
+	}
 	data, err := io.ReadAll(f)
 	got.GotErr(err)
 	hash := justhash(data[:len(data)-20])

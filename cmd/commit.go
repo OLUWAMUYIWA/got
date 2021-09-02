@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"os"
+
 	"github.com/OLUWAMUYIWA/got/internal"
 	"github.com/spf13/cobra"
 )
@@ -11,7 +13,11 @@ var commitCmd = &cobra.Command{
 	Short: "makes a commit to the local git",
 	Long:  `makes a commit to the local git.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		msg, _ := cmd.Flags().GetString("msg")
+		msg, err := cmd.Flags().GetString("msg")
+		if err != nil {
+			os.Stdout.WriteString("Got err: " + err.Error())
+			os.Exit(1)
+		}
 		git := internal.NewGot()
 		git.Commit(msg)
 	},
@@ -19,5 +25,5 @@ var commitCmd = &cobra.Command{
 
 func init() {
 	rootCmd.AddCommand(commitCmd)
-	addCmd.Flags().StringP("msg", "m", "new commit", "the message to be logged with the commit")
+	commitCmd.Flags().StringP("msg", "m", "new commit", "the message to be logged with the commit")
 }

@@ -155,13 +155,13 @@ func (got *Got) Commit(msg string) string {
 		got.GotErr(err)
 	buf_f := bufio.NewWriter(f)
 	_, err = buf_f.WriteString(sha1_s)
-		got.GotErr(err)
+	got.GotErr(err)
 	os.Stdout.WriteString("Commit succeded")
 	return sha1_s
 }
 
 func (got *Got) Push(url string) {
-if is, _ := IsGit(); !is {
-		got.logger.Fatalf("Not a valid git directory\n")
+	if is, _ := IsGit(); !is {
+			got.logger.Fatalf("Not a valid git directory\n")
 	}
 }

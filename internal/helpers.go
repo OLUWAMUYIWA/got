@@ -6,8 +6,10 @@ import (
 	"compress/zlib"
 	"crypto/sha1"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
@@ -17,16 +19,18 @@ import (
 
 //great, now I can remove every damn wkdir, I think.
 func IsGit() (bool, error) {
-	dirs, err := os.ReadDir(".")
-	if err != nil {
-		return false, OpenErr.addContext(err.Error())
-	}
-	for _, ent := range dirs {
-		if ent.IsDir() && ent.Name() == ".git" {
-			return true, nil
+	is := false
+	err := fs.WalkDir(os.DirFS("."), ".", func(path string, d fs.DirEntry, err error) error {
+		if d.IsDir() && d.Name() == ".git" {
+			is = true
+			return errors.New("done")
 		}
+		return nil
+	})
+	if errors.Is(err, errors.New("'done'")) {
+		err = nil
 	}
-	return false, OpenErr
+	return is, err
 }
 
 func HashFile(name string, w, std bool) error {
@@ -90,7 +94,7 @@ func getConfig() (string, string, error) {
 	if err != nil {
 		return "", "", IoReadErr.addContext(err.Error())
 	}
-	return config.uname, config.uname, nil
+	return config.Uname, config.Email, nil
 }
 
 
@@ -111,6 +115,7 @@ func (got *Got) writeToFile(path string, b []byte) error {
 	return err
 }
 
+//zlib compress
 func compress(writer io.Writer, data []byte) error {
 	comp := zlib.NewWriter(writer)
 	_, err := comp.Write(data)
@@ -125,6 +130,7 @@ func compress(writer io.Writer, data []byte) error {
 }
 
 
+//zlib uncompress
 func uncompress(rdr io.Reader, dst io.Writer) error {
 	comp, err := zlib.NewReader(rdr)
 	if err != nil {
