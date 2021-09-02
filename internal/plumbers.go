@@ -47,7 +47,7 @@ func Config(conf ConfigObject) error {
 //HashObject returns the hash of the file it hashes
 //plumber + helper function
 //needed for blobs, trees, and commit hashes
-func (got *Got) HashObject(data []byte, ty string) []byte {
+func (got *Got) HashObject(data []byte, ty string, w bool) []byte {
 	base, err := os.Getwd()
 	if err != nil {
 		got.GotErr(err)
@@ -64,22 +64,24 @@ func (got *Got) HashObject(data []byte, ty string) []byte {
 	s.Write(data)
 	b := []byte(s.String())
 	raw := justhash(b)
-	//the byte result must be converted to hex string as that is how it is useful to us
-	//we could either use fmt or hex.EncodeString here. Both works fine
-	hash_str := fmt.Sprintf("%x", raw)
-	//first two characters (1 byte) are the name of the directory. The remaining 38 (19 bytes) are the  name of the file
-	//that contains the compressed version of the blob.
-	//remember that sha1 produces a 20-byte hash (160 bits, or 40 hex characters)
-	path := filepath.Join(base, ".git/objects/", hash_str[:2])
-	err = os.MkdirAll(path, 0777)
-	got.GotErr(err)
-	fPath := filepath.Join(path, hash_str[2:])
-	f, err := os.Create(fPath)
-	got.GotErr(err)
-	defer f.Close()
-	//the actual file is then compressed and stored in the file created
-	err = compress(f, b)
-	got.GotErr(err)
+	if w {
+		//the byte result must be converted to hex string as that is how it is useful to us
+		//we could either use fmt or hex.EncodeString here. Both works fine
+		hash_str := fmt.Sprintf("%x", raw)
+		//first two characters (1 byte) are the name of the directory. The remaining 38 (19 bytes) are the  name of the file
+		//that contains the compressed version of the blob.
+		//remember that sha1 produces a 20-byte hash (160 bits, or 40 hex characters)
+		path := filepath.Join(base, ".git/objects/", hash_str[:2])
+		err = os.MkdirAll(path, 0777)
+		got.GotErr(err)
+		fPath := filepath.Join(path, hash_str[2:])
+		f, err := os.Create(fPath)
+		got.GotErr(err)
+		defer f.Close()
+		//the actual file is then compressed and stored in the file created
+		err = compress(f, b)
+		got.GotErr(err)
+	}
 
 	return raw
 }
@@ -317,6 +319,7 @@ func (got *Got) get_status() ([]string, []string, map[string]string) {
 	//TODO: check if this works fine
 	entries := make([]fs.DirEntry, 0)
 	var files []string
+	//do two things at the same time: ensure .git is not inncludesd in files, and fill up files with all cleaned paths to non-dir files
 	fs.WalkDir(os.DirFS("."), ".", func(path string, d fs.DirEntry, err error) error {
 		if d.IsDir() && d.Name() == ".git" {
 			return fs.SkipDir
@@ -327,22 +330,10 @@ func (got *Got) get_status() ([]string, []string, map[string]string) {
 		}
 		return nil
 	})
-
-	
-	err := fs.WalkDir(os.DirFS("."), ".", func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return fs.SkipDir
-		}
-		if !d.IsDir() {
-			files = append(files, filepath.Clean(path))
-		}
-		return nil
-	})
+	//sort the file paths
 	sort.Slice(files, func(i, j int) bool {
 		return strings.Compare(files[i], files[j]) == -1
 	})
-	got.GotErr(err)
-	
 	index := got.readIndexFile()
 	var index_map map[string]Index
 	for _, ind := range index {
@@ -355,15 +346,15 @@ func (got *Got) get_status() ([]string, []string, map[string]string) {
 				f, err := os.Open(f_path)
 				got.GotErr(err)
 				cont, err := io.ReadAll(f)
-					got.GotErr(err)
-			
-				if hex.EncodeToString(got.HashObject(cont, "blob")) != string(ind.path) {
+				got.GotErr(err)
+				
+				if hex.EncodeToString(got.HashObject(cont, "blob", false)) != hex.EncodeToString(ind.sha1_obj_id[:]) {
 					mod[string(ind.path)] = f_path
 				}
 			}
 		}
 	}
-	//no longer exists in the index file
+
 	added := func(files []string) {
 		for _, file := range files {
 			if _, ok := index_map[file]; !ok {
@@ -371,6 +362,8 @@ func (got *Got) get_status() ([]string, []string, map[string]string) {
 			}
 		}
 	}
+
+	//no longer exists in the index file
 	deleted := func(files []string) {
 		for _, f_path := range files {
 			if ind, ok := index_map[f_path]; ok {
@@ -384,7 +377,6 @@ func (got *Got) get_status() ([]string, []string, map[string]string) {
 	modified(files)
 	added(files)
 	deleted(files)
-	//did not exist in the index file
 
 	return add, del, mod
 }
@@ -394,13 +386,16 @@ func (got *Got) status() {
 	}
 	add, del, mod := got.get_status()
 	var s strings.Builder
+	if len(mod) != 0 {
+		s.WriteString("Modified files\n")
+	}
 	if len(add) != 0 {
-		s.WriteString(fmt.Sprintf("Added Files: \n%v\n", add))
+		s.WriteString(fmt.Sprintf("Untracked  Files: \n%v\n", add))
 	}
 	if len(del) != 0 {
 		s.WriteString(fmt.Sprintf("Deleted Files: \n%v\n", del))
 	}
-	s.WriteString("Modified files\n")
+
 	for k, v := range mod {
 		d := diff(k, v)
 		s.WriteString(fmt.Sprintf("%s\n", d))

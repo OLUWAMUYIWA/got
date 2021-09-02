@@ -55,7 +55,7 @@ func (got *Got) newIndex(path string) *Index {
 		got.GotErr(err)
 	}
 	blob, err := io.ReadAll(bufio.NewReader(f))
-	sha1 := got.HashObject(blob, "blob")
+	sha1 := justhash(blob)
 	var stat unix.Stat_t
 	err = unix.Stat(path, &stat)
 	if err != nil {

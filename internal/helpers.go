@@ -56,7 +56,7 @@ func HashFile(name string, w, std bool) error {
 	got := NewGot()
 	var h []byte
 	if w {
-		h = got.HashObject(b, "blob")	
+		h = got.HashObject(b, "blob", true)	
 	} else {
 		h = justhash(b)
 	}

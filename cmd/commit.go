@@ -19,7 +19,11 @@ var commitCmd = &cobra.Command{
 			os.Exit(1)
 		}
 		git := internal.NewGot()
-		git.Commit(msg)
+		_, err = git.Commit(msg)
+		if err != nil {
+			os.Stdout.WriteString("Got err: " + err.Error())
+			os.Exit(1)
+		}
 	},
 }
 

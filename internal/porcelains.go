@@ -105,31 +105,37 @@ func (got *Got) Add(paths []string) {
 
 //to write a tree, we need to stage the files first, then from the indexed files, we write the tree
 //TODO: for now, we support only root-level files
-func (got *Got) WriteTree() string {
+func (got *Got) WriteTree() (string, error) {
 	if is, _ := IsGit(); !is {
 		got.logger.Fatalf("Not a valid git directory\n")
 	}
 	// we need the mode, the path from root, and the sha1
 	indexes := got.readIndexFile()
+	if len(indexes) == 0 {
+		return "", fmt.Errorf("No file staged \n")
+	}
 	var b bytes.Buffer
 	for _, ind := range indexes {
 		mode := binary.LittleEndian.Uint32(ind.mode[:])
 		s := fmt.Sprintf("%o %s%v%x", mode, ind.path, sep, ind.sha1_obj_id)
 		b.Write([]byte(s))
 	}
-	hash := got.HashObject(b.Bytes(), "tree")
+	hash := got.HashObject(b.Bytes(), "tree", true)
 	hash_s := hex.EncodeToString(hash)
-	return hash_s
+	return hash_s, nil
 }
 
 //https://github.com/git/git/blob/master/Documentation/technical/http-protocol.txt
 //https://github.com/git/git/blob/master/Documentation/technical/pack-protocol.txt
 
-func (got *Got) Commit(msg string) string {
+func (got *Got) Commit(msg string) (string, error) {
 	if is, _ := IsGit(); !is {
 		got.logger.Fatalf("Not a valid git directory\n")
 	}
-	tree := got.WriteTree()
+	tree, err := got.WriteTree()
+	if err != nil {
+		return "", fmt.Errorf("Could not commit because: %w", err)
+	}
 	parent := got.getLocalMAsterHash()
 	uname, email, err := getConfig()
 	if err != nil {
@@ -147,7 +153,7 @@ func (got *Got) Commit(msg string) string {
 	s.WriteString(fmt.Sprintln())
 	s.WriteString(msg)
 	s.WriteString(fmt.Sprintln())
-	sha1 := got.HashObject([]byte(s.String()), "commit")
+	sha1 := got.HashObject([]byte(s.String()), "commit", true)
 	sha1_s := fmt.Sprintf("%x", sha1)
 	path := filepath.Join(".git", "refs", "head", "master")
 	//write the commit to refs/master
@@ -157,7 +163,7 @@ func (got *Got) Commit(msg string) string {
 	_, err = buf_f.WriteString(sha1_s)
 	got.GotErr(err)
 	os.Stdout.WriteString("Commit succeded")
-	return sha1_s
+	return sha1_s, nil
 }
 
 func (got *Got) Push(url string) {
