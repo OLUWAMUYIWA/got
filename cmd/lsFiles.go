@@ -13,12 +13,12 @@ var lsFilesCmd = &cobra.Command{
 	`,
 	Run: func(cmd *cobra.Command, args []string) {
 		got := internal.NewGot()
-		got.LsFiles(Details)
+		got.LsFiles(Stage)
 	},
 }
-var Details bool
+var Stage bool
 
 func init() {
 	rootCmd.AddCommand(lsFilesCmd)
-	addCmd.Flags().BoolVarP(&Details, "details", "d", false, "detailsshould we show deails?")
+	addCmd.Flags().BoolVarP(&Stage, "stage", "s", false, "should we show deails?, without this flag, only file names will be shown")
 }

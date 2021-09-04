@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 )
+
 //TODO: In doing this work, I have tried to do my best with error handling
 /// Errors that do not belong directly to the Git struct
 //Preference is to return these errors early after adding a context.
@@ -17,26 +18,26 @@ func (e *OpErr) Error() string {
 }
 
 var (
-	IOWriteErr       = &OpErr{"Could not write to the specified writer: "}
+	IOWriteErr    = &OpErr{"Could not write to the specified writer: "}
 	PermissionErr = &OpErr{"Permission denied: "}
 	FormatErr     = &OpErr{"Bad Formatting: "}
-	OpenErr = &OpErr{"Could not open file: "}
-	CopyErr = &OpErr{"COuld not copy data: "}
-	NotDefinedErr = &OpErr{"Value not defined" }
-	IOCreateErr = &OpErr{"Could not create file/ directory:"}
-	IoReadErr = &OpErr{"Could not read file:"}
-	NetworkErr = &OpErr{"Network Error: "}
+	OpenErr       = &OpErr{"Could not open file: "}
+	CopyErr       = &OpErr{"COuld not copy data: "}
+	NotDefinedErr = &OpErr{"Value not defined"}
+	IOCreateErr   = &OpErr{"Could not create file/ directory:"}
+	IoReadErr     = &OpErr{"Could not read file:"}
+	NetworkErr    = &OpErr{"Network Error: "}
 )
 
-func (e *OpErr)addContext(s string) *OpErr {
+func (e *OpErr) addContext(s string) *OpErr {
 	newErr := *e
-	newErr.ErrSTring = fmt.Sprintf("%s: %s",newErr.ErrSTring, s)
+	newErr.ErrSTring = fmt.Sprintf("%s: %s", newErr.ErrSTring, s)
 	return &newErr
 }
 
 /// |||The Got struct error handler |||| ///
 //GotErr is a convenience function for errors that will cause the program to exit
-func (git *Got)GotErr(msg interface{}) {
+func (git *Got) GotErr(msg interface{}) {
 	if msg != nil {
 		git.logger.Fatalf("got err: %v", msg)
 		os.Exit(1)

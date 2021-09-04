@@ -53,7 +53,7 @@ func getRemoteMasterHash(url, uname, passwd string) (string, error) {
 	//TODO comeback.seems protocol has changed
 	if lines[2][:40] == "0000000000000000000000000000000000000000" {
 		//TODO
-		return "",  FormatErr.addContext(fmt.Sprintln("protocol error"))
+		return "", FormatErr.addContext(fmt.Sprintln("protocol error"))
 	}
 	splits := strings.SplitN(lines[2], " ", 2)
 	master_sha := splits[0]

@@ -9,7 +9,7 @@ import (
 var catFileCmd = &cobra.Command{
 	Use:   "cat-file",
 	Short: "displays the content of a file",
-	Long: `displays the content of a file, given the name as positional arguments `,
+	Long:  `displays the content of a file, given the name as positional arguments `,
 	Run: func(cmd *cobra.Command, args []string) {
 		got := internal.NewGot()
 		// p, err := cmd.Flags().GetBool("pretty")
@@ -24,7 +24,7 @@ var catFileCmd = &cobra.Command{
 		}
 		mode := ""
 		//this ensures that default is pretty
-		if (!s && !t) {
+		if !s && !t {
 			mode = "pretty"
 		}
 		if s {

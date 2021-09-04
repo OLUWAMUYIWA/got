@@ -8,12 +8,14 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 )
 
 //we use sep in place of all zero-byte separators
 var sep byte = 0
+
 //Time format used in formatting commit time
 const TIME_FORMAT = "Mon Jan 2 15:04:05 2006 -0700"
 
@@ -54,33 +56,35 @@ func (got *Got) Status() {
 		got.logger.Fatalf("Not a valid git directory\n")
 	}
 	added, modified, deleted := got.get_status()
-	if len(added) != 0 {
-		_, err := fmt.Fprintf(got.logger.Writer(), "New files (untracked): %v\n To track run 'git add <filenale>'\n", added)
-			got.GotErr(err)
+	if len(added) != 0 || len(modified) != 0 || len(deleted) != 0 {
+		got.logger.Printf("Changes to be committed:\n\n")
 	}
 	if len(modified) != 0 {
 		_, err := fmt.Fprintf(got.logger.Writer(), "Modified files: %v\n To stage changes 'git add <filenale>'\n", modified)
-			got.GotErr(err)
+		got.GotErr(err)
 	}
 	if len(deleted) != 0 {
 		_, err := fmt.Fprintf(got.logger.Writer(), "Deleted files: %v\n", deleted)
-			got.GotErr(err)
+		got.GotErr(err)
+	}
+
+	if len(added) != 0 {
+		_, err := fmt.Fprintf(got.logger.Writer(), "Untracked files. Use `git add` to start tracking: %v\n To track run 'git add <filenale>'\n", added)
+		got.GotErr(err)
 	}
 }
 
 
+//To add files to the staging area/cache, 
+//first read the index file, and compare the paths of its contents to the set of new paths you want to add
 func (got *Got) Add(paths []string) {
 	if is, _ := IsGit(); !is {
 		got.logger.Fatalf("Not a valid git directory\n")
 	}
-	r := strings.NewReplacer("\\", "/")	
-	for i, path := range paths {
-		paths[i] = r.Replace(path)
-	}
 	indexes := got.readIndexFile()
 	//Go, unlike Rust does not have iterators. Shit!
 	var news []FPath
-	//couldn't quickly of amuch better way of comparing these two
+	//couldn't quicklyfind a much better way of comparing these two
 	var index_paths []string
 	for _, ind := range indexes {
 		index_paths = append(index_paths, string(ind.path))
@@ -96,15 +100,21 @@ func (got *Got) Add(paths []string) {
 		ind := got.newIndex(string(new))
 		new_inds = append(new_inds, ind)
 	}
+
 	if len(new_inds) != 0 {
+		//sort the indexes by path
+		sort.Slice(new_inds, func(i, j int) bool {
+			return strings.Compare(string(new_inds[i].path), string(new_inds[j].path)) == -1
+		})
 		got.UpdateIndex(new_inds)
 	} else {
 		fmt.Fprintf(os.Stdout, "No file to be added")
 	}
 }
 
-//to write a tree, we need to stage the files first, then from the indexed files, we write the tree
+//to write a tree, we need to stage the files first i.e. index them, then from the indexed files, we write the tree
 //TODO: for now, we support only root-level files
+//WriteTree just takes the current values in the index (i.e. the staged files) and writes as tree object
 func (got *Got) WriteTree() (string, error) {
 	if is, _ := IsGit(); !is {
 		got.logger.Fatalf("Not a valid git directory\n")
@@ -112,7 +122,7 @@ func (got *Got) WriteTree() (string, error) {
 	// we need the mode, the path from root, and the sha1
 	indexes := got.readIndexFile()
 	if len(indexes) == 0 {
-		return "", fmt.Errorf("No file staged \n")
+		return "", fmt.Errorf("No files staged \n")
 	}
 	var b bytes.Buffer
 	for _, ind := range indexes {
@@ -125,9 +135,11 @@ func (got *Got) WriteTree() (string, error) {
 	return hash_s, nil
 }
 
+
+
 //https://github.com/git/git/blob/master/Documentation/technical/http-protocol.txt
 //https://github.com/git/git/blob/master/Documentation/technical/pack-protocol.txt
-
+//Commit first writes the tree from the set of staged objects
 func (got *Got) Commit(msg string) (string, error) {
 	if is, _ := IsGit(); !is {
 		got.logger.Fatalf("Not a valid git directory\n")
@@ -136,7 +148,7 @@ func (got *Got) Commit(msg string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("Could not commit because: %w", err)
 	}
-	parent := got.getLocalMAsterHash()
+	parent := got.parentSha()
 	uname, email, err := getConfig()
 	if err != nil {
 		got.logger.Fatalf("during commit: %s \n", err)
@@ -154,11 +166,11 @@ func (got *Got) Commit(msg string) (string, error) {
 	s.WriteString(msg)
 	s.WriteString(fmt.Sprintln())
 	sha1 := got.HashObject([]byte(s.String()), "commit", true)
-	sha1_s := fmt.Sprintf("%x", sha1)
+	sha1_s := fmt.Sprintf("%x\n", sha1)
 	path := filepath.Join(".git", "refs", "head", "master")
-	//write the commit to refs/master
-	f, err := os.OpenFile(path, os.O_RDWR|os.O_APPEND, 0)
-		got.GotErr(err)
+	//write the commit to refs/head/master. replace, no append
+	f, err := os.OpenFile(path, os.O_RDWR, 0777)
+	got.GotErr(err)
 	buf_f := bufio.NewWriter(f)
 	_, err = buf_f.WriteString(sha1_s)
 	got.GotErr(err)
@@ -168,6 +180,6 @@ func (got *Got) Commit(msg string) (string, error) {
 
 func (got *Got) Push(url string) {
 	if is, _ := IsGit(); !is {
-			got.logger.Fatalf("Not a valid git directory\n")
+		got.logger.Fatalf("Not a valid git directory\n")
 	}
 }

@@ -40,7 +40,7 @@ var configCmd = &cobra.Command{
 			panic("provide the email")
 		}
 		config := internal.ConfigObject{
-			uname, 
+			uname,
 			email,
 		}
 		err = internal.Config(config)

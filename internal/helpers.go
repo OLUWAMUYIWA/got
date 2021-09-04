@@ -44,8 +44,8 @@ func HashFile(name string, w, std bool) error {
 	} else {
 		f, err := os.Open(name)
 		if err != nil {
-			return OpenErr.addContext(err.Error())	
-		}	
+			return OpenErr.addContext(err.Error())
+		}
 		var bread bytes.Buffer
 		_, err = io.Copy(&bread, f)
 		if err != nil {
@@ -56,7 +56,7 @@ func HashFile(name string, w, std bool) error {
 	got := NewGot()
 	var h []byte
 	if w {
-		h = got.HashObject(b, "blob", true)	
+		h = got.HashObject(b, "blob", true)
 	} else {
 		h = justhash(b)
 	}
@@ -89,14 +89,13 @@ func getConfig() (string, string, error) {
 	}
 	f, err := os.Open(filepath.Join(confRoot, ".git", ".config"))
 	dec := json.NewDecoder(f)
-	var config  ConfigObject
+	var config ConfigObject
 	err = dec.Decode(&config)
 	if err != nil {
 		return "", "", IoReadErr.addContext(err.Error())
 	}
 	return config.Uname, config.Email, nil
 }
-
 
 func diff(stra, strb string) string {
 	dmp := diffmatchpatch.New()
@@ -108,7 +107,7 @@ func (got *Got) writeToFile(path string, b []byte) error {
 	f, err := os.OpenFile(path, os.O_APPEND, 0)
 	defer f.Close()
 	got.GotErr(err)
-	
+
 	bufWriter := bufio.NewWriter(f)
 	_, err = bufWriter.Write(b)
 	got.GotErr(err)
@@ -129,7 +128,6 @@ func compress(writer io.Writer, data []byte) error {
 	return nil
 }
 
-
 //zlib uncompress
 func uncompress(rdr io.Reader, dst io.Writer) error {
 	comp, err := zlib.NewReader(rdr)
@@ -138,7 +136,7 @@ func uncompress(rdr io.Reader, dst io.Writer) error {
 	}
 	//to decompress data from zlib, Go is marvelously helpful here, you only have to read from the zlib reader
 	//I use copy here because it is cool and fast
-	if _,err := io.Copy(dst, comp); err != nil {
+	if _, err := io.Copy(dst, comp); err != nil {
 		return err
 	}
 	return nil

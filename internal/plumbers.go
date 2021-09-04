@@ -18,10 +18,9 @@ import (
 
 //###### PLUMBERS!!!!! #######
 //The Hitokiri Battousais. They do the killing, and they have no shame in doing it
-//Most Plumbers should send their errors upstream. Porcelains will handle them. Except when it is not a fit directory were in. 
+//Most Plumbers should send their errors upstream. Porcelains will handle them. Except when it is not a fit directory were in.
 //This exception is because plumbers can be used directly by the user too
 //TODO:Check all the endianness in this code
-
 
 func Config(conf ConfigObject) error {
 	confRoot, err := os.UserConfigDir()
@@ -59,7 +58,7 @@ func (got *Got) HashObject(data []byte, ty string, w bool) []byte {
 	hdr := fmt.Sprintf("%s %d", ty, len(data))
 	//i see no reason to handle errors here since no I/O is happening
 	//Builder only implements io.Writer.
-	s.WriteString(hdr)																				
+	s.WriteString(hdr)
 	s.WriteByte(sep)
 	s.Write(data)
 	b := []byte(s.String())
@@ -86,7 +85,7 @@ func (got *Got) HashObject(data []byte, ty string, w bool) []byte {
 	return raw
 }
 
-//FindObject takes a sha1 prefix. It returns the path to the object file. It doesn't care t open it 
+//FindObject takes a sha1 prefix. It returns the path to the object file. It doesn't care t open it
 //another method does that
 //we want to have findObject such that even though we do not have
 //a full 20 byte string, we can still find the path to the file
@@ -111,7 +110,7 @@ func (got *Got) FindObject(prefix string) (string, error) {
 	num := 0
 
 	for _, entry := range entries {
-		if entry.Type().IsRegular() && strings.HasPrefix(entry.Name(), prefix[2:]){
+		if entry.Type().IsRegular() && strings.HasPrefix(entry.Name(), prefix[2:]) {
 			num += 1
 			location = entry.Name()
 			if num > 1 {
@@ -126,7 +125,6 @@ func (got *Got) FindObject(prefix string) (string, error) {
 	}
 }
 
-
 //ReadObject bulds on findObject. First, it finds the object,
 //but it does more, it attempts to read it and assert that it contains valid git object files
 //apart from that, it tries to understand what kind of git object it is
@@ -138,7 +136,7 @@ func (got *Got) ReadObject(prefix string) (string, string, []byte, error) {
 	if err != nil {
 		return "", "", nil, err
 	}
-		//get the file name
+	//get the file name
 	splits := strings.Split(location, "/")
 	f_name := splits[len(splits)-1]
 
@@ -164,7 +162,7 @@ func (got *Got) ReadObject(prefix string) (string, string, []byte, error) {
 	//we expect nothing else to be in the buffer right now other than the data itself
 	data := b.Bytes()
 	dType, dLen := "", 0
-	_, err = fmt.Sscanf(string(hdr),"%s %d", &dType, &dLen)
+	_, err = fmt.Sscanf(string(hdr), "%s %d", &dType, &dLen)
 	if err != nil {
 		return "", "", nil, err
 	}
@@ -173,6 +171,7 @@ func (got *Got) ReadObject(prefix string) (string, string, []byte, error) {
 	}
 	return f_name, dType, data, nil
 }
+
 //CatFile displays the file info using the git logger (set as os.Stdout). It uses flags to determine what it displays
 func (got *Got) CatFile(prefix, mode string) {
 	//normalize
@@ -185,12 +184,12 @@ func (got *Got) CatFile(prefix, mode string) {
 	got.GotErr(err)
 	switch mode {
 	case "size":
-		got.logger.Printf("File %s: Size: %d\n",f_name, len(data))
+		got.logger.Printf("File %s: Size: %d\n", f_name, len(data))
 	case "type":
-		got.logger.Printf("File %s Type: %s\n",f_name, dType)
+		got.logger.Printf("File %s Type: %s\n", f_name, dType)
 	case "pretty":
 		if dType == "commit" || dType == "blob" {
-			got.logger.Printf("Content %s: \n%s", f_name, string(data))	
+			got.logger.Printf("Content %s: \n%s", f_name, string(data))
 		} else if dType == "tree" {
 			//is a directory. ewe need to read th tree before printing
 			got.logger.Printf("Directory: \n")
@@ -199,13 +198,13 @@ func (got *Got) CatFile(prefix, mode string) {
 				got.CatFile(obj.sha1, "pretty")
 			}
 		}
-	default: 
-		got.logger.Fatalf("Bad flag mode. Check again, must be either size, type, pretty \n")	
+	default:
+		got.logger.Fatalf("Bad flag mode. Check again, must be either size, type, pretty \n")
 	}
 }
 
 //write the index file, given a slice of index
-//the gt version of updataindex
+//this is the function that stages files
 //Index file integers in git are written in NE.
 func (got *Got) UpdateIndex(entries []*Index) {
 	if is, _ := IsGit(); !is {
@@ -268,7 +267,7 @@ func (got *Got) readIndexFile() []Index {
 	numEntries := binary.BigEndian.Uint32(hdr[8:])
 	//we need to check what the header says.
 	if strings.Compare(sign, "DIRC") != 0 {
-		got.GotErr(fmt.Errorf("signature %s is not valid", sign))
+		got.GotErr(fmt.Errorf("bad index file sha1 signature: %s", sign))
 	}
 	if version != 2 {
 		got.GotErr(fmt.Errorf("Version number must be 2, got %d", version))
@@ -284,13 +283,21 @@ func (got *Got) readIndexFile() []Index {
 	return indexes
 }
 
-func (got *Got) LsFiles(detail bool) {
+
+//LsFiles prints to stdOut the state of staged files, i.e. the index files
+//After a Commit, it is clean
+func (got *Got) LsFiles(stage bool) {
 	if is, _ := IsGit(); !is {
 		got.logger.Fatalf("Not a valid git directory\n")
 	}
-	for _, ind := range got.readIndexFile() {
+	indexes := got.readIndexFile()
+	if len(indexes) != 0 {
+		got.logger.Printf("No staged files\n")
+		return
+	}
+	for _, ind := range indexes {
 		path := string(ind.path)
-		if detail {
+		if stage {
 			//eating the mode and sha1 is easy. As for the mode, we'll octal-format it later with fmt, and the sha too
 			mode := binary.BigEndian.Uint32(ind.mode[:])
 			sha1 := ind.sha1_obj_id[:]
@@ -302,7 +309,7 @@ func (got *Got) LsFiles(detail bool) {
 			s := fmt.Sprintf("Mode: %o sha1: %x  stage: %d path: %s\n", mode, sha1, stage, path)
 			got.logger.Printf(s)
 		} else {
-			got.logger.Printf(path)
+			got.logger.Printf("%s\n",path)
 		}
 	}
 }
@@ -330,16 +337,18 @@ func (got *Got) get_status() ([]string, []string, map[string]string) {
 		}
 		return nil
 	})
+	fmt.Println(files)
 	//sort the file paths
 	sort.Slice(files, func(i, j int) bool {
 		return strings.Compare(files[i], files[j]) == -1
 	})
+	//from the index we know files that are currently staged
 	index := got.readIndexFile()
 	var index_map map[string]Index
 	for _, ind := range index {
 		index_map[string(ind.path)] = ind
 	}
-	//stored hash in index differs from the new hash
+	//stored hash in index differs from the new hash, these ones have been modified. They are being tracked
 	modified := func(files []string) {
 		for _, f_path := range files {
 			if ind, ok := index_map[f_path]; ok {
@@ -347,7 +356,7 @@ func (got *Got) get_status() ([]string, []string, map[string]string) {
 				got.GotErr(err)
 				cont, err := io.ReadAll(f)
 				got.GotErr(err)
-				
+
 				if hex.EncodeToString(got.HashObject(cont, "blob", false)) != hex.EncodeToString(ind.sha1_obj_id[:]) {
 					mod[string(ind.path)] = f_path
 				}
@@ -355,6 +364,7 @@ func (got *Got) get_status() ([]string, []string, map[string]string) {
 		}
 	}
 
+	//not being tracked yet, since they haven't been staged
 	added := func(files []string) {
 		for _, file := range files {
 			if _, ok := index_map[file]; !ok {
@@ -401,42 +411,25 @@ func (got *Got) status() {
 		s.WriteString(fmt.Sprintf("%s\n", d))
 	}
 	_, err := fmt.Fprintf(os.Stdout, "%s\n", s.String())
-		got.GotErr(err)
-	
+	got.GotErr(err)
+
 }
 
-
-func (got *Got) getLocalMAsterHash() string {
-	if is, _ := IsGit(); !is {
-		got.logger.Fatalf("Not a valid git directory\n")
-	}
+//sha-1 of the last commit (or shall we say latest?)
+func (got *Got) parentSha() string {
 	path := filepath.Join(".git", "refs", "head", "master")
 	f, err := os.Open(path)
-		got.GotErr(err)
-	
+	got.GotErr(err)
+
 	//Hahaha. I always feel good anytime I'm able to explit Go's interface semantics
 	var s strings.Builder
 	_, err = io.Copy(&s, f)
-		got.GotErr(err)
-	return strings.TrimSpace(s.String())
-}
-
-//TODO: This function isn't what I want
-//TODO: I do not know if os.setenv sets the environment variable permanently, like saving it in a .bash_profile, .bash_rc, /etc/profile, .zsh_rc etc.
-//or maybe it is better to store it in a file in the git installation folder. I should think that is better
-func SetEnvVars(name, email string) error {
-	if err := os.Setenv("GOT_USERNAME", name); err != nil {
-		return err
-	}
-	if err := os.Setenv("GOT_USER_MAIL", email); err != nil {
-		return err
-	}
-	return nil
+	got.GotErr(err)
+	return strings.Trim(s.String(), "\n")
 }
 
 
-
-func (got *Got) deserTree(sha string) ([]Object) {
+func (got *Got) deserTree(sha string) []Object {
 	if is, _ := IsGit(); !is {
 		got.logger.Fatalf("Not a valid git directory\n")
 	}
@@ -457,19 +450,18 @@ func (got *Got) deserTree(sha string) ([]Object) {
 			break
 		}
 		split := bytes.SplitN(d, []byte(" "), 2)
-		md :=  string(split[0])
+		md := string(split[0])
 		mode, err := strconv.ParseUint(md, 8, 32)
 		got.GotErr(err)
 		sep_pos := bytes.IndexByte(split[1], sep)
 		path = string(split[1][:sep_pos])
-		sha1 = string(split[1][sep_pos+1: sep_pos+21])
-		start += len(split[0]) + 1 + sep_pos+1 + 20
+		sha1 = string(split[1][sep_pos+1 : sep_pos+21])
+		start += len(split[0]) + 1 + sep_pos + 1 + 20
 		objs = append(objs, Object{mode, path, sha1})
 	}
-	
+
 	return objs
 }
-
 
 func (got *Got) findTreeObjs(sha1 string) []string {
 	var objs []string
@@ -477,13 +469,12 @@ func (got *Got) findTreeObjs(sha1 string) []string {
 		if fs.FileMode(obj.mode) == os.ModeDir {
 			objs = append(objs, got.findTreeObjs(obj.sha1)...)
 		} else {
-			objs =append(objs, obj.sha1)
+			objs = append(objs, obj.sha1)
 		}
 	}
 
 	return objs
 }
-
 
 func (got *Got) findCommitObjs(sha1 string) []string {
 	var objs []string
@@ -541,10 +532,13 @@ func (got *Got) encodePackObjects(sha1 string) []byte {
 
 	ty_num := 0
 	switch ty {
-	case "commit": ty_num = 1
-	case "tree": ty_num = 2
-	case "blob": ty_num = 3
-	default: 
+	case "commit":
+		ty_num = 1
+	case "tree":
+		ty_num = 2
+	case "blob":
+		ty_num = 3
+	default:
 	}
 	if ty_num == 0 {
 		got.GotErr(errors.New("wrong boject type"))
@@ -553,7 +547,7 @@ func (got *Got) encodePackObjects(sha1 string) []byte {
 	by := (ty_num << 4) | (size & 0x0f)
 	size >>= 4
 	var ret bytes.Buffer
-	for i:=size; i > 0; i++ {
+	for i := size; i > 0; i++ {
 		var b []byte
 		binary.BigEndian.PutUint64(b, uint64((by | 0x80)))
 		ret.Write(b)
@@ -567,20 +561,19 @@ func (got *Got) encodePackObjects(sha1 string) []byte {
 	return ret.Bytes()
 }
 
-
 func (got *Got) createPack(objs []string) []byte {
 	//var b bytes.Buffer
 	var b []byte
-	b =  append(b, []byte("PACK")...)
+	b = append(b, []byte("PACK")...)
 	var buf []byte
 	binary.BigEndian.PutUint32(buf, 2)
 	b = append(b, buf...)
 	binary.BigEndian.PutUint32(buf, uint32(len(objs)))
 	b = append(b, buf...)
-	sort.Slice(objs, func(i, j int) bool {return strings.Compare(objs[i], objs[j]) == -1})
+	sort.Slice(objs, func(i, j int) bool { return strings.Compare(objs[i], objs[j]) == -1 })
 	for _, obj := range objs {
 		b = append(b, got.encodePackObjects(obj)...)
-	} 
+	}
 	sha1 := justhash(b)
 	b = append(b, sha1...)
 	return b

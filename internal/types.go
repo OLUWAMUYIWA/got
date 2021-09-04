@@ -14,10 +14,9 @@ import (
 )
 
 /// |||GIT struct||| ////
-type Got struct{
+type Got struct {
 	logger log.Logger
 }
-
 
 func NewGot() *Got {
 	logger := log.New(os.Stdout, "GOT: ", log.Default().Flags())
@@ -28,8 +27,7 @@ func NewGot() *Got {
 //TODO: replace all path strings with this. better to alias, they all look silly as strings
 type FPath string
 
-
-
+//The index stores all the info about files needed to write a tree object
 //we want to ensure that the index is a multiple of 8 bytes, so we might pad with null bytes if need be
 type Index struct {
 	ctime_s     [4]byte
@@ -45,7 +43,6 @@ type Index struct {
 	sha1_obj_id [20]byte
 	flags       [2]byte
 	//ver         [2]byte
-	//depends on the name of the file
 	path []byte
 }
 
@@ -121,7 +118,7 @@ func mapint64ToBytes(t int64) [4]byte {
 func shaToBytes(hex []byte) [20]byte {
 	if len(hex) != 20 {
 		//don't even try to use this method id the length of the slic is not exactly 20. Thank you!
-		 panic(fmt.Errorf("length not equal to 20"))
+		panic(fmt.Errorf("length not equal to 20"))
 	}
 	var b [20]byte
 	for i := range hex {
@@ -169,7 +166,7 @@ func (i *Index) marshall() []byte {
 func destructureIntoIndex(b []byte) Index {
 	var i Index
 	start, lim := 0, 4
-	//closure crunches the four-byters 
+	//closure crunches the four-byters
 	get_next_four := func(b []byte) [4]byte {
 		var arr [4]byte
 		for i, pos := start, 0; i < lim; i, pos = i+1, pos+1 {
@@ -208,7 +205,7 @@ func destructureIntoIndex(b []byte) Index {
 		for i, pos := start, 0; i < lim; i, pos = i+1, pos+1 {
 			arr[pos] = b[i]
 		}
-		start = start+2
+		start = start + 2
 		return arr
 	}
 	i.flags = get_next_two(b)
@@ -233,7 +230,7 @@ func unmarshal(data []byte) []Index {
 		//now we deal with the path
 		//remeber we filled the remaining bytes with zero bytes just after the path
 		//and remember that paths are string files, text, more precicely. They could never have zero bytes
-		//so it is safe to assume that the first instance of byte(0) signifies the end of the path 
+		//so it is safe to assume that the first instance of byte(0) signifies the end of the path
 		i := bytes.IndexByte(data[62:], sep)
 		if i >= 0 {
 			//clean
@@ -252,14 +249,12 @@ func unmarshal(data []byte) []Index {
 	return indexEntries
 }
 
-
-//Object is a composite datatype representing any of the three types in the git obects directory: blobs, trees, commits 
+//Object is a composite datatype representing any of the three types in the git obects directory: blobs, trees, commits
 type Object struct {
 	mode uint64
 	path string
 	sha1 string
 }
-
 
 type ConfigObject struct {
 	Uname string `json: uname`
