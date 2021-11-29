@@ -1,0 +1,4 @@
+- use io.MultiReader to combine bytes.Reader and strings.Reader and Files,  that I want toput in one reader
+- use bufio instead of bytes.Buffer in places. bytes.Buffer implements all the io interfaces apart from io.loser and Seeker
+- do two protocols
+- handle the cli app by myself

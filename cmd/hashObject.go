@@ -1,10 +1,6 @@
 package cmd
 
 import (
-	"fmt"
-	"os"
-
-	"github.com/OLUWAMUYIWA/got/internal"
 	"github.com/spf13/cobra"
 )
 
@@ -18,21 +14,16 @@ Thye should be one of:
 "blob",, "tree", "commit"
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		std, err := cmd.Flags().GetBool("stdin")
-		if err != nil {
-			fmt.Printf("err: %s", err)
-			os.Exit(1)
-		}
-		write, err := cmd.Flags().GetBool("write")
-		if err != nil {
-			fmt.Printf("err: %s", err)
-			os.Exit(1)
-		}
-		if std {
-			internal.HashFile("", write, std)
-		} else {
-			internal.HashFile(args[0], write, std)
-		}
+		// std, err := cmd.Flags().GetBool("stdin")
+		// if err != nil {
+		// 	fmt.Printf("err: %s", err)
+		// 	os.Exit(1)
+		// }
+		// write, err := cmd.Flags().GetBool("write")
+		// if err != nil {
+		// 	fmt.Printf("err: %s", err)
+		// 	os.Exit(1)
+		// }
 	},
 }
 

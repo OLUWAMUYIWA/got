@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/hex"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -21,69 +19,6 @@ import (
 //Most Plumbers should send their errors upstream. Porcelains will handle them. Except when it is not a fit directory were in.
 //This exception is because plumbers can be used directly by the user too
 //TODO:Check all the endianness in this code
-
-func Config(conf ConfigObject) error {
-	confRoot, err := os.UserConfigDir()
-	if err != nil {
-		return NotDefinedErr.addContext(err.Error())
-	}
-	err = os.Mkdir(filepath.Join(confRoot, ".git"), os.ModeDir)
-	if err != nil {
-		return IOWriteErr.addContext(err.Error())
-	}
-	f, err := os.Create(filepath.Join(confRoot, ".git", ".config"))
-	if err != nil {
-		return IOCreateErr.addContext(err.Error())
-	}
-	enc := json.NewEncoder(f)
-	err = enc.Encode(conf)
-	if err != nil {
-		return IOWriteErr.addContext(err.Error())
-	}
-	return nil
-}
-
-//HashObject returns the hash of the file it hashes
-//plumber + helper function
-//needed for blobs, trees, and commit hashes
-func (got *Got) HashObject(data []byte, ty string, w bool) []byte {
-	base, err := os.Getwd()
-	if err != nil {
-		got.GotErr(err)
-	}
-	//use a string builder because it minimizzed memory allocation, which is expensive
-	//each write appends to the builder
-	//IGNORING errors here, too many writes, error handling will bloat the code.
-	var s strings.Builder
-	hdr := fmt.Sprintf("%s %d", ty, len(data))
-	//i see no reason to handle errors here since no I/O is happening
-	//Builder only implements io.Writer.
-	s.WriteString(hdr)
-	s.WriteByte(sep)
-	s.Write(data)
-	b := []byte(s.String())
-	raw := justhash(b)
-	if w {
-		//the byte result must be converted to hex string as that is how it is useful to us
-		//we could either use fmt or hex.EncodeString here. Both works fine
-		hash_str := fmt.Sprintf("%x", raw)
-		//first two characters (1 byte) are the name of the directory. The remaining 38 (19 bytes) are the  name of the file
-		//that contains the compressed version of the blob.
-		//remember that sha1 produces a 20-byte hash (160 bits, or 40 hex characters)
-		path := filepath.Join(base, ".git/objects/", hash_str[:2])
-		err = os.MkdirAll(path, 0777)
-		got.GotErr(err)
-		fPath := filepath.Join(path, hash_str[2:])
-		f, err := os.Create(fPath)
-		got.GotErr(err)
-		defer f.Close()
-		//the actual file is then compressed and stored in the file created
-		err = compress(f, b)
-		got.GotErr(err)
-	}
-
-	return raw
-}
 
 //FindObject takes a sha1 prefix. It returns the path to the object file. It doesn't care t open it
 //another method does that
@@ -148,13 +83,13 @@ func (got *Got) ReadObject(prefix string) (string, string, []byte, error) {
 	//create a buffer to hold the bytes to be read from zlib
 	//buffer implements io.Writer
 	var b bytes.Buffer
-	uncompress(f, &b)
+	decompress(f, &b)
 	if err != nil {
 		return "", "", nil, err
 	}
 	//remember that when writing the file, we put in a separator sep to demarcate the header from the body
 	//sep is equal to byte(0)
-	hdr, err := b.ReadBytes(sep)
+	hdr, err := b.ReadBytes(Sep)
 	if err != nil {
 		return "", "", nil, err
 	}
@@ -203,85 +138,6 @@ func (got *Got) CatFile(prefix, mode string) {
 	}
 }
 
-//write the index file, given a slice of index
-//this is the function that stages files
-//Index file integers in git are written in NE.
-func (got *Got) UpdateIndex(entries []*Index) {
-	if is, _ := IsGit(); !is {
-		got.logger.Fatalf("Not a valid git directory\n")
-	}
-	var hdr []byte
-	hdr = append(hdr, []byte("DIRC")...)
-	//buf is apparently reusable
-	var buf []byte
-	binary.BigEndian.PutUint32(buf, 2)
-	hdr = append(hdr, buf[:4]...)
-	//use the same buffer, since the buffer does not keep its state. It starts over
-	binary.BigEndian.PutUint32(buf, uint32(len(entries)))
-	hdr = append(hdr, buf[:4]...)
-	var data []byte
-	for _, entry := range entries {
-		data = append(data, entry.marshall()...)
-	}
-	allData := bytes.Join([][]byte{hdr, data}, nil)
-	checksum := justhash(allData)
-	index := bytes.Join([][]byte{allData, checksum}, nil)
-	err := got.writeToFile(filepath.Join(".git", "index"), index)
-	if err != nil {
-		got.GotErr(err)
-	}
-}
-
-// read: https://mincong.io/2018/04/28/git-index/
-//The index file contains:
-// 12-byte header.
-// A number of sorted index entries.
-// Extensions. They are identified by signature.
-// 160-bit SHA-1 over the content of the index file before this checksum.
-
-func (got *Got) readIndexFile() []Index {
-	if is, _ := IsGit(); !is {
-		got.logger.Fatalf("Not a valid git directory\n")
-	}
-	f, err := os.Open(filepath.Join(".git/index"))
-	p_err, ok := err.(*os.PathError)
-	if ok {
-		temp_err := errors.New("no such file or directory")
-		if p_err.Unwrap() == temp_err {
-			got.logger.Fatalf("You have not indexed any file\n")
-		}
-	} else {
-		got.GotErr(err)
-	}
-	data, err := io.ReadAll(f)
-	got.GotErr(err)
-	hash := justhash(data[:len(data)-20])
-	//the index file has the lst 160 bits (i.e. 20 bytes) as the sha-1 checksum of all the bits tat come before it
-	//we need to ensure that it matches before considering the data valid
-	if bytes.Compare(hash, data[:(len(data)-20)]) != 0 {
-		got.GotErr(errors.New("Checksum is not equal to file digest. File has been tampered with"))
-	}
-	hdr := data[:12]
-	sign := string(hdr[:4])
-	version := binary.BigEndian.Uint32(hdr[4:8])
-	numEntries := binary.BigEndian.Uint32(hdr[8:])
-	//we need to check what the header says.
-	if strings.Compare(sign, "DIRC") != 0 {
-		got.GotErr(fmt.Errorf("bad index file sha1 signature: %s", sign))
-	}
-	if version != 2 {
-		got.GotErr(fmt.Errorf("Version number must be 2, got %d", version))
-	}
-	//now for the index entries :
-	//we need to use the unix fstat
-	//the index files are listed between the 12-byte header and the 20-byte checksum
-	indEntries := data[12:(len(data) - 20)]
-	indexes := unmarshal(indEntries)
-	if len(indexes) != int(numEntries) {
-		got.GotErr(fmt.Errorf("Number of enteries does not equal to what the head specified"))
-	}
-	return indexes
-}
 
 
 //LsFiles prints to stdOut the state of staged files, i.e. the index files
@@ -290,7 +146,7 @@ func (got *Got) LsFiles(stage bool) {
 	if is, _ := IsGit(); !is {
 		got.logger.Fatalf("Not a valid git directory\n")
 	}
-	indexes := got.readIndexFile()
+	indexes := readIndexFile(got)
 	if len(indexes) != 0 {
 		got.logger.Printf("No staged files\n")
 		return
@@ -327,6 +183,7 @@ func (got *Got) get_status() ([]string, []string, map[string]string) {
 	entries := make([]fs.DirEntry, 0)
 	var files []string
 	//do two things at the same time: ensure .git is not inncludesd in files, and fill up files with all cleaned paths to non-dir files
+	//TODO check if DrFS should be this `.`
 	fs.WalkDir(os.DirFS("."), ".", func(path string, d fs.DirEntry, err error) error {
 		if d.IsDir() && d.Name() == ".git" {
 			return fs.SkipDir
@@ -340,10 +197,10 @@ func (got *Got) get_status() ([]string, []string, map[string]string) {
 	fmt.Println(files)
 	//sort the file paths
 	sort.Slice(files, func(i, j int) bool {
-		return strings.Compare(files[i], files[j]) == -1
+		return files[i] < files[j] 
 	})
 	//from the index we know files that are currently staged
-	index := got.readIndexFile()
+	index := readIndexFile(got)
 	var index_map map[string]Index
 	for _, ind := range index {
 		index_map[string(ind.path)] = ind
@@ -356,8 +213,11 @@ func (got *Got) get_status() ([]string, []string, map[string]string) {
 				got.GotErr(err)
 				cont, err := io.ReadAll(f)
 				got.GotErr(err)
-
-				if hex.EncodeToString(got.HashObject(cont, "blob", false)) != hex.EncodeToString(ind.sha1_obj_id[:]) {
+				raw, err := hashWithObjFormat(cont, "blob")
+				if err != nil {
+					return
+				}
+				if hex.EncodeToString(raw) != hex.EncodeToString(ind.sha1_obj_id[:]) {
 					mod[string(ind.path)] = f_path
 				}
 			}
@@ -415,25 +275,41 @@ func (got *Got) status() {
 
 }
 
-//sha-1 of the last commit (or shall we say latest?)
-func (got *Got) parentSha() string {
-	path := filepath.Join(".git", "refs", "head", "master")
-	f, err := os.Open(path)
-	got.GotErr(err)
 
-	//Hahaha. I always feel good anytime I'm able to explit Go's interface semantics
-	var s strings.Builder
-	_, err = io.Copy(&s, f)
-	got.GotErr(err)
-	return strings.Trim(s.String(), "\n")
-}
-
-
-func (got *Got) deserTree(sha string) []Object {
+//to write a tree, we need to stage the files first i.e. index them, then from the indexed files, we write the tree
+//TODO: for now, we support only root-level files
+//WriteTree just takes the current values in the index (i.e. the staged files) and writes as tree object
+func (got *Got) WriteTree() (string, error) {
 	if is, _ := IsGit(); !is {
 		got.logger.Fatalf("Not a valid git directory\n")
 	}
-	objs := make([]Object, 0)
+	// we need the mode, the path from root, and the sha1
+	indexes := readIndexFile(got)
+	if len(indexes) == 0 {
+		return "", fmt.Errorf("No files staged \n")
+	}
+	var b bytes.Buffer
+	for _, ind := range indexes {
+		mode := binary.BigEndian.Uint32(ind.mode[:])
+		s := fmt.Sprintf("%o %s%v%v", mode, ind.path, Sep, ind.sha1_obj_id)
+		b.Write([]byte(s))
+	}
+	tree := treeObj{
+		data: b.Bytes(),
+	}
+	hash, err := tree.Hash(got.baseDir)
+	if err != nil {
+		return "", fmt.Errorf("Writing Tree: %w", err)
+	}
+	hash_s := hex.EncodeToString(hash)
+	return hash_s, nil
+}
+
+//return all the objects (subtrees and blobs) inside a tree
+func (got *Got) deserTree(sha string) []treeItem {
+	if is, _ := IsGit(); !is {
+		got.logger.Fatalf("Not a valid git directory\n")
+	}
 	_, ty, data, err := got.ReadObject(sha)
 	got.GotErr(err)
 	if ty != "tree" {
@@ -442,6 +318,7 @@ func (got *Got) deserTree(sha string) []Object {
 	if len(data) == 0 {
 		got.GotErr("data is empty")
 	}
+	objs := make([]treeItem, 0)
 	var path, sha1 string
 	start := 0
 	for {
@@ -453,15 +330,17 @@ func (got *Got) deserTree(sha string) []Object {
 		md := string(split[0])
 		mode, err := strconv.ParseUint(md, 8, 32)
 		got.GotErr(err)
-		sep_pos := bytes.IndexByte(split[1], sep)
+		sep_pos := bytes.IndexByte(split[1], Sep)
 		path = string(split[1][:sep_pos])
 		sha1 = string(split[1][sep_pos+1 : sep_pos+21])
 		start += len(split[0]) + 1 + sep_pos + 1 + 20
-		objs = append(objs, Object{mode, path, sha1})
+		objs = append(objs, treeItem{mode, path, sha1})
 	}
 
 	return objs
 }
+
+//TODO: readTree() -> read the contents of a tree into the staging area
 
 func (got *Got) findTreeObjs(sha1 string) []string {
 	var objs []string
@@ -520,62 +399,8 @@ func (got *Got) missingObjs(localSha string, remoteSha string) []string {
 	return ret
 }
 
-func (got *Got) encodePackObjects(sha1 string) []byte {
-	_, ty, data, err := got.ReadObject(sha1)
-	got.GotErr(err)
-	var b bytes.Buffer
-	err = compress(&b, data)
-	if err != nil {
-		got.GotErr(err)
-	}
-	data_compressed := b.Bytes()
 
-	ty_num := 0
-	switch ty {
-	case "commit":
-		ty_num = 1
-	case "tree":
-		ty_num = 2
-	case "blob":
-		ty_num = 3
-	default:
-	}
-	if ty_num == 0 {
-		got.GotErr(errors.New("wrong boject type"))
-	}
-	size := len(data)
-	by := (ty_num << 4) | (size & 0x0f)
-	size >>= 4
-	var ret bytes.Buffer
-	for i := size; i > 0; i++ {
-		var b []byte
-		binary.BigEndian.PutUint64(b, uint64((by | 0x80)))
-		ret.Write(b)
-		by = size & 0x7f
-		size >>= 7
-	}
-	var buff []byte
-	binary.BigEndian.PutUint64(buff, uint64(by))
-	ret.Write(buff)
-	ret.Write(data_compressed)
-	return ret.Bytes()
-}
 
-func (got *Got) createPack(objs []string) []byte {
-	//var b bytes.Buffer
-	var b []byte
-	b = append(b, []byte("PACK")...)
-	var buf []byte
-	binary.BigEndian.PutUint32(buf, 2)
-	b = append(b, buf...)
-	binary.BigEndian.PutUint32(buf, uint32(len(objs)))
-	b = append(b, buf...)
-	sort.Slice(objs, func(i, j int) bool { return strings.Compare(objs[i], objs[j]) == -1 })
-	for _, obj := range objs {
-		b = append(b, got.encodePackObjects(obj)...)
-	}
-	sha1 := justhash(b)
-	b = append(b, sha1...)
-	return b
-
-}
+//TODO
+//func (got *Got) Log() {}
+//output the commit info starting from the latest commit

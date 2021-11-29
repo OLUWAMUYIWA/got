@@ -39,7 +39,7 @@ var configCmd = &cobra.Command{
 		if err != nil {
 			panic("provide the email")
 		}
-		config := internal.ConfigObject{
+		config := internal.User {
 			uname,
 			email,
 		}

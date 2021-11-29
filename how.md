@@ -1,5 +1,7 @@
 Learn Go and Git by writing a git client in Go
 
+
+
 # Table Of Contents
 
 Here, I write about how I wrote this client. It will be very long, so please be ready to either sit for long or pause at some point and come back later
@@ -52,3 +54,9 @@ and using those buffers. It also provides extension methods, useful ones at that
 //How to use 
 
 # Error Handling
+
+
+I've found out that if one wnats to make the implementing of a popular protocol easier, it is a good thing to read up other people's
+blog posts, presentations, and other resources that can help  understand how others think about the protocol. The formal specification
+of the git protocol was to my inexperienced quite terse in some places, and I had to rely on other resources to understand. I made sure to go
+back to the original specs everytime.

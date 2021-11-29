@@ -4,28 +4,15 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
-	"log"
 	"math"
 	"os"
+	"path/filepath"
 
 	"golang.org/x/sys/unix"
 )
-
-/// |||GIT struct||| ////
-type Got struct {
-	logger log.Logger
-}
-
-func NewGot() *Got {
-	logger := log.New(os.Stdout, "GOT: ", log.Default().Flags())
-	logger.Printf("Got: ")
-	return &Got{logger: *logger}
-}
-
-//TODO: replace all path strings with this. better to alias, they all look silly as strings
-type FPath string
 
 //The index stores all the info about files needed to write a tree object
 //we want to ensure that the index is a multiple of 8 bytes, so we might pad with null bytes if need be
@@ -45,6 +32,8 @@ type Index struct {
 	//ver         [2]byte
 	path []byte
 }
+
+type Sha1 = [20]byte
 
 func (got *Got) newIndex(path string) *Index {
 	f, err := os.Open(string(path))
@@ -103,6 +92,7 @@ func setUpFlags(name string) [2]byte {
 	return ret
 }
 
+//TODO: should prolly use little-endian since that is what intel porocessors use
 //we use bigendian because it is network-endian
 func mapint64ToBytes(t int64) [4]byte {
 	//right shift the bits by 32 or maybe not, since the lower bits will be zeroes
@@ -110,7 +100,7 @@ func mapint64ToBytes(t int64) [4]byte {
 	arr[0] = byte(t >> (32 - 8))
 	arr[1] = byte(t >> (32 - 16))
 	arr[2] = byte(t >> (32 - 24))
-	arr[3] = byte(t >> (32 - 32))
+	arr[3] = byte(t >> (32 - 32)) //or t & 0xff
 	return arr
 }
 
@@ -159,7 +149,7 @@ func (i *Index) marshall() []byte {
 	fill := datalen - (b.Len() + pathlen)
 	b.Write(i.path)
 	//Fill it with zero bytes
-	space_fill := bytes.Repeat([]byte{sep}, fill)
+	space_fill := bytes.Repeat([]byte{Sep}, fill)
 	b.Write(space_fill)
 	return b.Bytes()
 }
@@ -231,12 +221,13 @@ func unmarshal(data []byte) []Index {
 		//remeber we filled the remaining bytes with zero bytes just after the path
 		//and remember that paths are string files, text, more precicely. They could never have zero bytes
 		//so it is safe to assume that the first instance of byte(0) signifies the end of the path
-		i := bytes.IndexByte(data[62:], sep)
+		i := bytes.IndexByte(data[62:], Sep)
 		if i >= 0 {
 			//clean
 			path := data[64:i]
 			token = append(token, path...)
 		}
+		//TODO: what if I use: len(token) + 7 /8
 		advance = int(math.Ceil(float64(len(token)+8)/8) * 8)
 		err = nil
 		return
@@ -249,14 +240,86 @@ func unmarshal(data []byte) []Index {
 	return indexEntries
 }
 
-//Object is a composite datatype representing any of the three types in the git obects directory: blobs, trees, commits
-type Object struct {
-	mode uint64
-	path string
-	sha1 string
+
+// read: https://mincong.io/2018/04/28/git-index/
+//The index file contains:
+// 12-byte header.
+// A number of sorted index entries.
+// Extensions. They are identified by signature.
+// 160-bit SHA-1 over the content of the index file before this checksum.
+
+func readIndexFile(got *Got) ([]Index, error) {
+	if is, _ := IsGit(); !is {
+		got.logger.Fatalf("Not a valid git directory\n")
+	}
+	f, err := os.Open(filepath.Join(".git/index"))
+	p_err, ok := err.(*os.PathError)
+	if ok {
+		temp_err := errors.New("no such file or directory")
+		if p_err.Unwrap() == temp_err {
+			got.logger.Fatalf("You have not indexed any file\n")
+		}
+	} else {
+		got.UpErr(err)
+		return nil, err
+	}
+	data, err := io.ReadAll(f)
+	got.GotErr(err)
+	hash := justhash(data[:len(data)-20])
+	//the index file has the lst 160 bits (i.e. 20 bytes) as the sha-1 checksum of all the bits tat come before it
+	//we need to ensure that it matches before considering the data valid
+	if bytes.Compare(hash, data[:(len(data)-20)]) != 0 {
+		got.GotErr(errors.New("Checksum is not equal to file digest. File has been tampered with"))
+	}
+	hdr := data[:12]
+	sign := string(hdr[:4])
+	version := binary.BigEndian.Uint32(hdr[4:8])
+	numEntries := binary.BigEndian.Uint32(hdr[8:])
+	//we need to check what the header says.
+	if sign != "DIRC" {
+		got.GotErr(fmt.Errorf("bad index file sha1 signature: %s", sign))
+	}
+	if version != 2 {
+		got.GotErr(fmt.Errorf("Version number must be 2, got %d", version))
+	}
+	//now for the index entries :
+	//we need to use the unix fstat
+	//the index files are listed between the 12-byte header and the 20-byte checksum
+	indEntries := data[12:(len(data) - 20)]
+	indexes := unmarshal(indEntries)
+	if len(indexes) != int(numEntries) {
+		got.GotErr(fmt.Errorf("Number of enteries does not equal to what the head specified"))
+	}
+	return indexes
 }
 
-type ConfigObject struct {
-	Uname string `json: uname`
-	Email string `json: email`
+//write the index file, given a slice of index
+//this is the function that stages files
+//Index file integers in git are written in NE.
+func (got *Got) UpdateIndex(entries []*Index) {
+	if is, _ := IsGit(); !is {
+		got.logger.Fatalf("Not a valid git directory\n")
+	}
+	var hdr []byte
+	hdr = append(hdr, []byte("DIRC")...)
+	//buf is apparently reusable
+	var buf []byte
+	binary.BigEndian.PutUint32(buf, 2)
+	hdr = append(hdr, buf[:4]...)
+	//use the same buffer, since the buffer does not keep its state. It starts over
+	binary.BigEndian.PutUint32(buf, uint32(len(entries)))
+	hdr = append(hdr, buf[:4]...)
+	var data []byte
+	for _, entry := range entries {
+		data = append(data, entry.marshall()...)
+	}
+	allData := bytes.Join([][]byte{hdr, data}, nil)
+	checksum := justhash(allData)
+	index := bytes.Join([][]byte{allData, checksum}, nil)
+	err := got.writeToFile(filepath.Join(".git", "index"), index)
+	if err != nil {
+		got.GotErr(err)
+	}
 }
+
+

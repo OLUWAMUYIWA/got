@@ -18,11 +18,17 @@ Special thanks to the following people, without whom I would've been unable to m
 
 - [The Pro-Git book authors]() *For a good understanding of how git works internally, nothing is better than Pro-Git's internals chapter*
 - [Ben Hoyt]() Before implementing this client, the first thing I did after reading the `internals` chapter of the book was to read through Bens Python solution. *Whenever I got stuck (and that was more than a few times), I looked again at how Ben did it in Python. Thanks a great deal!*
+- James Coglans [blog](https://blog.jcoglan.com/2017/02/12/the-myers-diff-algorithm-part-1/) is a goldmine! I stumbled on his blog while reading an article about Rust. It turns out that he implemented a sound
+git client in Ruby and posted explanations of key problems he solved. I read and internalised his detailed explanation of diffs. Thank you 
+James!
+-Ben Johnson is another guy whose blog I stumbled upon while writing this project. His articles are not about `git`. They're about `go`.
+He made them clear, precise, and easily digestible. I found myself going back to the finished parts of the code to restructure, optimize, and use better `go` idioms. Check it out his [walkthroughs](https://www.gobeyond.dev/tag/go-walkthrough/)
 - [mincong](https://mincong.io/2018/04/28/git-index/) *mingcong explained the index file in a superb way. Thanks!*
-
+-[ChimeraCoder](https://adityamukerjee.net/) wrote a git client at the recurse center
 
 ## TODO
 - Allow Branching
 - Allow adding of deeper-nested files
 - Write unit tests for all plumbers
 - make asynchronous
+
