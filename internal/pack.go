@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/OLUWAMUYIWA/got/internal/proto"
 )
 
 func (got *Got) createPack(objs []string) []byte {
@@ -28,7 +30,6 @@ func (got *Got) createPack(objs []string) []byte {
 	return b
 
 }
-
 
 func (got *Got) encodePackObjects(sha1 string) []byte {
 	_, ty, data, err := got.ReadObject(sha1)
@@ -71,17 +72,16 @@ func (got *Got) encodePackObjects(sha1 string) []byte {
 	return ret.Bytes()
 }
 
-
-func verifyPack(p *Pack) error {
+func verifyPack(p *proto.Pack) error {
 	if is, err := IsGit(); err != nil || !is {
 		return errors.New("not git girectory")
 	}
-	pack, err := os.Open(filepath.Join(".git", "objects", "pack", strings.Join([]string{p.sha, ".pack"}, "")))
+	pack, err := os.Open(filepath.Join(".git", "objects", "pack", strings.Join([]string{p.Sha, ".pack"}, "")))
 	if err != nil {
 		return err
 	}
 	defer pack.Close()
-	idx, err := os.Open(filepath.Join(".git", "objects", "pack",  strings.Join([]string{p.sha, ".idx"}, "")))
+	idx, err := os.Open(filepath.Join(".git", "objects", "pack", strings.Join([]string{p.Sha, ".idx"}, "")))
 	defer idx.Close()
 	if err != nil {
 		return err

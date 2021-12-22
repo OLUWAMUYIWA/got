@@ -8,8 +8,9 @@ import (
 	"sort"
 	"strings"
 	"time"
-)
 
+	"github.com/OLUWAMUYIWA/got/internal/proto"
+)
 
 //Time format used in formatting commit time
 const TIME_FORMAT = "Mon Jan 2 15:04:05 2006 -0700"
@@ -69,14 +70,16 @@ func (got *Got) Status() {
 	}
 }
 
-
-//To add files to the staging area/cache, 
+//To add files to the staging area/cache,
 //first read the index file, and compare the paths of its contents to the set of new paths you want to add
 func (got *Got) Add(paths []string) {
 	if is, _ := IsGit(); !is {
 		got.logger.Fatalf("Not a valid git directory\n")
 	}
-	indexes := readIndexFile(got)
+	indexes, err := readIndexFile(got)
+	if err != nil {
+		got.FatalErr(err)
+	}
 	//Go, unlike Rust does not have iterators. Shit!
 	var news []string
 	//couldn't quicklyfind a much better way of comparing these two
@@ -107,9 +110,6 @@ func (got *Got) Add(paths []string) {
 	}
 }
 
-
-
-
 //https://github.com/git/git/blob/master/Documentation/technical/http-protocol.txt
 //https://github.com/git/git/blob/master/Documentation/technical/pack-protocol.txt
 //Commit first writes the tree from the set of staged objects
@@ -127,7 +127,7 @@ func (got *Got) Commit(msg string) (string, error) {
 	head := InitRef(filepath.Join(got.baseDir))
 	parent, err := head.ReadCont()
 	if err != nil {
-		return "", fmt.Errorf("Commit error: %w",err)
+		return "", fmt.Errorf("Commit error: %w", err)
 	}
 	//get uname and email from configuration file
 	uname, email, err := getConfig()
@@ -153,11 +153,11 @@ func (got *Got) Commit(msg string) (string, error) {
 	_, err = commit.Hash(got.baseDir)
 	if err != nil {
 		//TODO: handle error
-	} 
+	}
 	path := filepath.Join(".git", "refs", "head", "master")
 	//write the commit to refs/head/master. replace, no append
-	//this becomes the latest commit in the master branch. 
-	//the refs/head/master is a symbolic to the 
+	//this becomes the latest commit in the master branch.
+	//the refs/head/master is a symbolic to the
 	f, err := os.OpenFile(path, os.O_RDWR, 0777)
 	got.GotErr(err)
 	buf_f := bufio.NewWriter(f)
@@ -167,8 +167,8 @@ func (got *Got) Commit(msg string) (string, error) {
 	return commit.sha, nil
 }
 
-//after refs and capabilities discovery, client may send the flush packet to tell the server it has ended	
-func(got *Got) LsRemote() {
+//after refs and capabilities discovery, client may send the flush packet to tell the server it has ended
+func (got *Got) LsRemote() {
 
 }
 
@@ -188,7 +188,7 @@ func (got *Got) Push(url string) {
 	}
 	head := InitRef(filepath.Join(got.baseDir))
 	localSha, err := head.ReadCont()
-	remoteSha, err := gnet.GetRemoteMasterHash(url, uname, passwd)
+	remoteSha, err := proto.GetRemoteMasterHash(url, uname, passwd)
 	got.GotErr(err)
 	missings := got.missingObjs(string(localSha), remoteSha)
 	//TODO: inform the user

@@ -1,4 +1,4 @@
-package internal
+package proto
 
 //TODO: check Henry Warren's Hackers Delight
 
@@ -11,5 +11,5 @@ func checkCRC(crcs []byte) error {
 }
 
 func simple(msg []byte, crc byte) {
-	
+
 }

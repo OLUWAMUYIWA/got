@@ -5,16 +5,15 @@ import (
 	"os"
 )
 
-
 type Got struct {
 	baseDir string
-	logger log.Logger
+	logger  log.Logger
 }
+
 const (
-	Sep byte = 0
+	Sep   byte = 0
 	Space byte = ' '
 )
-
 
 func NewGot(dir ...string) *Got {
 	baseDir := ""
@@ -34,12 +33,22 @@ func NewGot(dir ...string) *Got {
 	return &Got{baseDir: baseDir, logger: *logger}
 }
 
-
 //All Git objects are stored the same way, just with different types – instead of the string blob, the
 //header will begin with commit or tree.
 //Git first constructs a header which starts by identifying the type of object
 //To that first part of the header, Git adds a space followed by the size in bytes of the content, and adding a final null byte
 //Git concatenates the header and the original content and then calculates the SHA-1 checksum of that new content.
-func (got *Got) writeObject(ty string) {
+// const (
+// 	blob ObjectType = 1 << iota
+// 	tree
+// 	commit
+// )
 
+func (got *Got) writeObject(ty ObjectType) {
+
+}
+
+func (got *Got) GotErr(err error) {
+	//comeback
+	//todo
 }

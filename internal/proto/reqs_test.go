@@ -8,5 +8,5 @@ import (
 
 func TestNegotiatePkFile(t *testing.T) {
 	assert := assert.New(t)
-	assert.Equal(1,2)
+	assert.Equal(1, 2)
 }

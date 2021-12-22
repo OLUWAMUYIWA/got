@@ -13,8 +13,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-
-	"github.com/sergi/go-diff/diffmatchpatch"
 )
 
 //great, now I can remove every damn wkdir, I think.
@@ -33,21 +31,19 @@ func IsGit() (bool, error) {
 	return is, err
 }
 
-
-
 //getConfig gets into got's config and gets the username and email
 //I chose to use json because reading and writing it is clean and easy. No stress
 func getConfig() (string, string, error) {
 	confRoot, err := os.UserConfigDir()
 	if err != nil {
-		return "", "", NotDefinedErr.AddContext(err.Error())
+		return "", "", &OpErr{Context: "IO: While Getting Config file ", inner: err}
 	}
 	f, err := os.Open(filepath.Join(confRoot, ".git", ".config"))
 	dec := json.NewDecoder(f)
 	var user User
 	err = dec.Decode(&user)
 	if err != nil {
-		return "", "", IoReadErr.AddContext(err.Error())
+		return "", "", &OpErr{Context: "IO: While Getting Config file ", inner: err}
 	}
 	return user.Uname, user.Email, nil
 }
@@ -74,11 +70,11 @@ func compress(writer io.Writer, data []byte) error {
 	comp := zlib.NewWriter(writer)
 	_, err := comp.Write(data)
 	if err != nil {
-		return IOWriteErr.AddContext(err.Error())
+		return &OpErr{Context: "IO: while compressing ", inner: err}
 	}
 	err = comp.Flush()
 	if err != nil {
-		return IOWriteErr.AddContext(err.Error())
+		return &OpErr{Context: "IO: while compressing ", inner: err}
 	}
 	return nil
 }
@@ -98,7 +94,6 @@ func decompress(rdr io.Reader, dst io.Writer) error {
 	return nil
 }
 
-
 //justhash is the hash function used by hashobj
 func justhash(data []byte) []byte {
 	//create a  new hasher
@@ -113,8 +108,6 @@ func justhash(data []byte) []byte {
 	//and returns the result
 	return hahser.Sum(nil)
 }
-
-
 
 func hashWithObjFormat(data []byte, ty string) ([]byte, error) {
 	var s strings.Builder
@@ -153,9 +146,16 @@ func uvarint(r io.Reader) (uint64, error) {
 			return 0, err
 		}
 		if b[0]&0x80 == 0 {
-			return res | uint64(b[0]) << d, nil
+			return res | uint64(b[0])<<d, nil
 		}
 		res |= uint64(b[0]&0x7f) << d
 		d += 7
 	}
+}
+
+//had to repeat this here to avoid cyclic dependencies
+//checks if the kth bit is set. contract: n <= 255. indexed beginning from zero
+func isKthSet(i uint8, k int) bool {
+	mask := uint8(1) << k
+	return (i & mask) != 0
 }

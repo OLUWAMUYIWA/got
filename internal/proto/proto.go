@@ -1,22 +1,25 @@
 package proto
 
-import "fmt"
-
-
+import (
+	"fmt"
+)
 
 type ProtoErr struct {
-	ErrString string
-	inner error	
+	Context string
+	Inner   error
 }
 
 var (
-	NetworkErr = &ProtoErr{ErrString: "Network Error: "}
+	GenericNetErr = &ProtoErr{Context: "Network Error"}
 )
 
 func (p *ProtoErr) Error() string {
-	return fmt.Sprintf("Protocol Error: %v\nInner:%s", p.ErrString,p.inner)
+	if p.Inner != nil {
+		return fmt.Sprintf("Protocol Error: %v\nInner:%s", p.Context, p.Inner)
+	}
+	return fmt.Sprintf("Protocol Error: %s\n", p.Context)
 }
 
 func (p *ProtoErr) Unwrap() error {
-	return p.inner
+	return p.Inner
 }

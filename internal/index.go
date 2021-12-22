@@ -240,7 +240,6 @@ func unmarshal(data []byte) []Index {
 	return indexEntries
 }
 
-
 // read: https://mincong.io/2018/04/28/git-index/
 //The index file contains:
 // 12-byte header.
@@ -290,7 +289,7 @@ func readIndexFile(got *Got) ([]Index, error) {
 	if len(indexes) != int(numEntries) {
 		got.GotErr(fmt.Errorf("Number of enteries does not equal to what the head specified"))
 	}
-	return indexes
+	return indexes, nil
 }
 
 //write the index file, given a slice of index
@@ -321,5 +320,3 @@ func (got *Got) UpdateIndex(entries []*Index) {
 		got.GotErr(err)
 	}
 }
-
-

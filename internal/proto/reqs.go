@@ -10,12 +10,11 @@ import (
 	"io"
 	"net/http"
 	"strings"
-
 )
 
 //where the client and server determine what the minimal packfile necessary for transport is
 func NegotiatePkFile() {
-	//tell the server 
+	//tell the server
 	//send wants
 	//send shallows
 	//send optional commit depth
@@ -27,10 +26,10 @@ func NegotiatePkFile() {
 	//server responds with 'ACK obj-id continue' for every 'have' that we send and it has
 	//once the server has found an acceptable common base commit and is ready to make a packfile, it will blindly ACK all have obj-ids back to the client.
 	//server sends a 'NAK', to which the client responds with a 'done' or another list of 'have' lines
-	//the momemt the client receives enough 'ACK' to color every packetline it has sent as an have, or when it 
+	//the momemt the client receives enough 'ACK' to color every packetline it has sent as an have, or when it
 	//gives up because it has sent 256 have lines without getting any of them ACKed by the server, it sends 'done'
 	//when server receives 'done', it sends a 'ACK obj-id' (obj-id of the latest commit they share) or a 'NAK',
-	//server sends 'NAK' if there is no common base  
+	//server sends 'NAK' if there is no common base
 
 }
 
@@ -40,13 +39,13 @@ func sendReq(serviceName string) func(body io.Reader) {
 func sendPostReq(url, uname, passwd string, body io.Reader) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, url, body)
 	if err != nil {
-		return nil, &ProtoErr{ErrString: "While sending post request", inner: err}
+		return nil, &ProtoErr{Context: "While sending post request", Inner: err}
 	}
 	req.SetBasicAuth(uname, passwd)
 	cl := http.DefaultClient
 	resp, err := cl.Do(req)
 	if err != nil {
-		return nil, &ProtoErr{ErrString: "While exec-ing post request", inner: err}
+		return nil, &ProtoErr{Context: "While exec-ing post request", Inner: err}
 	}
 	return resp, nil
 }
@@ -54,12 +53,12 @@ func sendPostReq(url, uname, passwd string, body io.Reader) (*http.Response, err
 func sendGetReq(url, uname, passwd string) (*http.Response, error) {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return nil, &ProtoErr{ErrString: "While exec-ing get request", inner: err}
+		return nil, &ProtoErr{Context: "While exec-ing get request", Inner: err}
 	}
 	req.SetBasicAuth(uname, passwd)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, &ProtoErr{ErrString: "While exec-ing get request", inner: err}
+		return nil, &ProtoErr{Context: "While exec-ing get request", Inner: err}
 	}
 	return resp, nil
 }
@@ -72,29 +71,28 @@ func GetRemoteMasterHash(url, uname, passwd string) (string, error) {
 	}
 	lines := decodePktResp(resp)
 	if lines[0] != "# service=git-receive-pack" {
-		return "", &ProtoErr{ErrString: "While getting remote master hash", inner: fmt.Errorf("Protocol error")}
+		return "", &ProtoErr{Context: "While getting remote master hash", Inner: fmt.Errorf("Protocol error")}
 	}
 	if lines[1] != "" {
-		return "", &ProtoErr{ErrString: "While getting remote master hash", inner: fmt.Errorf("Protocol error")}
+		return "", &ProtoErr{Context: "While getting remote master hash", Inner: fmt.Errorf("Protocol error")}
 	}
 	//TODO comeback.seems protocol has changed
 	if lines[2][:40] == "0000000000000000000000000000000000000000" {
 		//TODO
-		return "", &ProtoErr{ErrString: "While getting remote master hash", inner: fmt.Errorf("Protocol error")}
+		return "", &ProtoErr{Context: "While getting remote master hash", Inner: fmt.Errorf("Protocol error")}
 	}
 	splits := strings.SplitN(lines[2], " ", 2)
 	master_sha := splits[0]
 	master_ref := strings.SplitN(splits[1], fmt.Sprintf("\\0"), 2)[0]
 
 	if master_ref != "refs/heads/master" {
-		return "", &ProtoErr{ErrString: "While getting remote master hash", inner: fmt.Errorf("Protocol error")}
+		return "", &ProtoErr{Context: "While getting remote master hash", Inner: fmt.Errorf("Protocol error")}
 	}
 	if len(master_sha) != 40 {
-		return "", &ProtoErr{ErrString: "While getting remote master hash", inner: fmt.Errorf("SHA is bad")}
+		return "", &ProtoErr{Context: "While getting remote master hash", Inner: fmt.Errorf("SHA is bad")}
 	}
 	return master_sha, nil
 }
-
 
 func decodePktResp(resp *http.Response) []string {
 	defer resp.Body.Close()
@@ -134,10 +132,9 @@ func encodePkt(strs []string) string {
 	return s.String()
 }
 
-
 func buildLines(lines []byte) []byte {
 	buff := new(bytes.Buffer)
-	for _, _ =  range lines {
+	for _, _ = range lines {
 		buff.WriteString(fmt.Sprintf(""))
 	}
 	//TODO

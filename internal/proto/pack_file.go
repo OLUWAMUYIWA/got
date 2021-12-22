@@ -26,6 +26,7 @@ import (
 // - OBJ_REF_DELTA (7)
 
 type pkObjectType = uint8
+
 const (
 	_ pkObjectType = iota // Type 0 is invalid
 	OBJ_COMMIT
@@ -37,36 +38,42 @@ const (
 	OBJ_REF_DELTA
 )
 
-//TODO: TRY USING SOMETHING LIKE THE ENCODER INTERFACE TO DESCRIBE THE FUNCTIONALITY OF THE PACK. CHECK HEX ENCODER 
+//TODO: TRY USING SOMETHING LIKE THE ENCODER INTERFACE TO DESCRIBE THE FUNCTIONALITY OF THE PACK. CHECK HEX ENCODER
 type Pack struct {
-	sha string
-	objects map[string]*pkObject
+	Sha     string
+	Objects map[string]*pkObject
 }
 
 type pkObject struct {
-	idx idx
-	ty pkObjectType
-	data []byte //would either be the uncompressed data, of the uncompressed delta
+	idx        idx
+	ty         pkObjectType
+	data       []byte //would either be the uncompressed data, of the uncompressed delta
 	sizeUncomp uint64
-	sizeComp uint64
-	baseObj string
+	sizeComp   uint64
+	baseObj    string
 	baseOffset uint64
-	depth uint32
-
+	depth      uint32
 }
 
 type idx struct {
-	sha []byte
+	sha    []byte
 	offset uint64
 }
+
 func (p *pkObject) Type() string {
 	switch p.ty {
-	case OBJ_COMMIT: return "commit"
-	case OBJ_TREE: return "tree"
-	case OBJ_BLOB: return "blob"
-	case OBJ_OFS_DELTA: return "OBJ_OFS_DELTA" 
-	case OBJ_REF_DELTA: return "OBJ_REF_DELTA"
-	default:return ""
+	case OBJ_COMMIT:
+		return "commit"
+	case OBJ_TREE:
+		return "tree"
+	case OBJ_BLOB:
+		return "blob"
+	case OBJ_OFS_DELTA:
+		return "OBJ_OFS_DELTA"
+	case OBJ_REF_DELTA:
+		return "OBJ_REF_DELTA"
+	default:
+		return ""
 	}
 }
 
@@ -88,13 +95,13 @@ func parsePackFile(pack, idx io.ReadSeekCloser) (Pack, error) {
 		}
 		return Pack{}, fmt.Errorf("Failed reading: %w", err)
 	}
-	
+
 	sig := "PACK"
 	if bytes.Compare([]byte(sig), hdr[0:4]) != 0 {
-		return Pack{}, &ObjectErr{}
+		return Pack{}, &ProtoErr{Context: "not a valid pack file, Signature is not PACK as was expected"}
 	}
 	//chose uint64 to prevent overflow
-	version := binary.BigEndian.Uint64(hdr[4:8]) 
+	version := binary.BigEndian.Uint64(hdr[4:8])
 	if version != 2 || version != 3 {
 		//TODO: handle error better
 		return Pack{}, fmt.Errorf("Bad formatting")
@@ -102,14 +109,14 @@ func parsePackFile(pack, idx io.ReadSeekCloser) (Pack, error) {
 	objNum := binary.BigEndian.Uint32(hdr[8:12])
 	if len(idxes) != int(objNum) {
 		return Pack{}, fmt.Errorf("idx file and pack file disagree on number of objects")
-	} 
+	}
 	if n != 12 {
-		return Pack{}, &ObjectErr{}
+		return Pack{}, &ProtoErr{Context: "header not up to 12 bytes, check"}
 	}
 	packs := make(map[string]*pkObject)
 	for _, idx := range idxes {
 		obj := pkObject{}
-		
+
 		obj.idx = idx
 		pack.Seek(int64(idx.offset), io.SeekStart)
 		var meta []byte
@@ -118,7 +125,7 @@ func parsePackFile(pack, idx io.ReadSeekCloser) (Pack, error) {
 		for {
 			_, err := pack.Read(buf)
 			if err != nil {
-				return Pack{}, &ObjectErr{}
+				return Pack{}, &ProtoErr{Context: "Error reading pack_file", Inner: err}
 			}
 			meta = append(meta, buf[0])
 			if !isKthSet(buf[0], 7) {
@@ -134,15 +141,16 @@ func parsePackFile(pack, idx io.ReadSeekCloser) (Pack, error) {
 			if b < 0x80 { //last byte
 				size |= uint64(b) << d
 			}
-			size |= uint64(b & 0x7f) << d
+			size |= uint64(b&0x7f) << d
 			d += 7
 		}
 
 		switch ty {
-			case OBJ_COMMIT, OBJ_TREE, OBJ_BLOB:  {
+		case OBJ_COMMIT, OBJ_TREE, OBJ_BLOB:
+			{
 				buf := make([]byte, size)
 				r := io.LimitReader(pack, int64(size))
-				z,_ := zlib.NewReader(r)
+				z, _ := zlib.NewReader(r)
 				_, err = z.Read(buf)
 				if err != nil {
 					return Pack{}, err
@@ -151,7 +159,8 @@ func parsePackFile(pack, idx io.ReadSeekCloser) (Pack, error) {
 				obj.ty = ty
 				z.Close()
 			}
-			case OBJ_REF_DELTA: {
+		case OBJ_REF_DELTA:
+			{
 				//we have the name of the base object and the delta data
 				sha := make([]byte, 20)
 				_, err := pack.Read(sha)
@@ -164,21 +173,22 @@ func parsePackFile(pack, idx io.ReadSeekCloser) (Pack, error) {
 				_, err = z.Read(buf)
 				if err != nil {
 					//TODO
-				} 
+				}
 				obj.data = buf
 			}
-			case OBJ_OFS_DELTA: {
+		case OBJ_OFS_DELTA:
+			{
 				var MSB uint8 = 0x80
 				var negOffset uint64
-				 d := 0
+				d := 0
 				for {
 					b := make([]byte, 1)
 					_, err := pack.Read(b)
 					if err != nil {
 						//TODO
 					}
-					negOffset |= uint64(b[0] & 0x7f) << d
-					d+=7
+					negOffset |= uint64(b[0]&0x7f) << d
+					d += 7
 					if MSB&0x80 == 0 {
 						break
 					}
@@ -194,20 +204,19 @@ func parsePackFile(pack, idx io.ReadSeekCloser) (Pack, error) {
 				z.Close()
 
 			}
-			default: return Pack{}, fmt.Errorf("Bad format")
+		default:
+			return Pack{}, fmt.Errorf("Bad format")
 		}
 		packs[hex.EncodeToString(idx.sha)] = &obj
 	}
 
-	p := Pack {
-		sha: hex.EncodeToString(packSha),
-		objects: packs,
+	p := Pack{
+		Sha:     hex.EncodeToString(packSha),
+		Objects: packs,
 	}
 
 	return p, nil
 }
-
-
 
 //checks if the kth bit is set. contract: n <= 255. indexed beginning from zero
 func isKthSet(i uint8, k int) bool {
@@ -217,18 +226,14 @@ func isKthSet(i uint8, k int) bool {
 
 //TODO: come back
 func getBitRange(i uint8, l int, r int) uint8 {
-	return (i >> uint8(r)) & (^uint8(0) >> (8 - (l-r + 1)))
+	return (i >> uint8(r)) & (^uint8(0) >> (8 - (l - r + 1)))
 }
-
 
 func packTypeAndRem(i uint8) (pkObjectType, uint8) {
-	ty :=  pkObjectType(getBitRange(i, 6, 4))
-	rem := getBitRange(i,3,0)
+	ty := pkObjectType(getBitRange(i, 6, 4))
+	rem := getBitRange(i, 3, 0)
 	return ty, rem
 }
-
-
-
 
 func parseIdxFile(r io.ReadCloser) ([]idx, []byte, error) {
 	defer r.Close()
@@ -237,23 +242,23 @@ func parseIdxFile(r io.ReadCloser) ([]idx, []byte, error) {
 	wtr := new(bytes.Buffer)
 	idRdr := io.TeeReader(r, wtr)
 	hdr := make([]byte, 8)
-	_, err:= io.ReadFull(idRdr, hdr)
+	_, err := io.ReadFull(idRdr, hdr)
 	if err != nil {
 		if errors.Is(err, io.ErrUnexpectedEOF) {
-			return nil, nil,  errors.New("could not read header completely")
+			return nil, nil, errors.New("could not read header completely")
 		}
 		return nil, nil, err
 	}
 	//check firstpart of hdr
 	//A 4-byte magic number '\377tOc' which is an unreasonable fanout[0] value.
 	if bytes.Compare(hdr[0:4], []byte{255, 116, 79, 99}) != 0 {
-		return nil, nil,  errors.New("invalid header")
+		return nil, nil, errors.New("invalid header")
 	}
 
 	//check version
 	//A 4-byte version number (= 2)
 	if ver := binary.BigEndian.Uint32(hdr[4:8]); ver != 2 {
-		return nil, nil,  errors.New("wrong version included. expected 2")
+		return nil, nil, errors.New("wrong version included. expected 2")
 	}
 	buf := make([]byte, 1026)
 	_, err = io.ReadFull(idRdr, buf)
@@ -269,9 +274,9 @@ func parseIdxFile(r io.ReadCloser) ([]idx, []byte, error) {
 	//let's make the table a seuence of 4 bytes each
 	//TODO:check
 	for i := 0; i < len(buf); {
-		fanout[i/4] =  buf[i:i+4]
+		fanout[i/4] = buf[i : i+4]
 		i += 4
-	} 
+	}
 	//from the last element of the fan-out table we get the total number of objects in the pack
 	objNum := binary.BigEndian.Uint32(fanout[len(fanout)-1])
 
@@ -286,9 +291,9 @@ func parseIdxFile(r io.ReadCloser) ([]idx, []byte, error) {
 	}
 	idxes := []idx{}
 	//TODO: check
-	for i,j := 0,0; i < int(objNum); i++ {
-		idxes[i].sha = shas[j:j+20] //hex.EncodeToString(shas[j:j+20]) i'm trying to avoid allocation
-		j+=20
+	for i, j := 0, 0; i < int(objNum); i++ {
+		idxes[i].sha = shas[j : j+20] //hex.EncodeToString(shas[j:j+20]) i'm trying to avoid allocation
+		j += 20
 	}
 
 	valuesCRC32Flat := make([]byte, objNum*4)
@@ -299,8 +304,8 @@ func parseIdxFile(r io.ReadCloser) ([]idx, []byte, error) {
 	if err := checkCRC(valuesCRC32Flat); err != nil {
 		return nil, nil, fmt.Errorf("Cyclic Redundancy Check failed")
 	}
-	offFlat:= make([]byte, objNum*4)
-	_, err = io.ReadFull(idRdr, offFlat)  
+	offFlat := make([]byte, objNum*4)
+	_, err = io.ReadFull(idRdr, offFlat)
 	if err != nil {
 		if errors.Is(err, io.ErrUnexpectedEOF) {
 			return nil, nil, fmt.Errorf("Could not read offsets completely")
@@ -309,8 +314,8 @@ func parseIdxFile(r io.ReadCloser) ([]idx, []byte, error) {
 
 	//chunk the offests
 	offsets := make([][4]byte, objNum)
-	j,k := 0,0
-	for i :=0; i < len(offFlat); i++ {
+	j, k := 0, 0
+	for i := 0; i < len(offFlat); i++ {
 		offsets[j][k] = offFlat[i]
 		k++
 		if k == 4 {
@@ -320,17 +325,17 @@ func parseIdxFile(r io.ReadCloser) ([]idx, []byte, error) {
 	}
 
 	// These are usually 31-bit pack file offsets
-	offs:= []uint64{}
+	offs := []uint64{}
 	m := make(map[int]uint64)
 	isLarge := 0
 	for i := range offsets {
-		ui32 := binary.BigEndian.Uint32(offsets[i][:]); 
-		ui64 := uint64(ui32);
-		if ui64 & 0x80000000 != 0 {
+		ui32 := binary.BigEndian.Uint32(offsets[i][:])
+		ui64 := uint64(ui32)
+		if ui64&0x80000000 != 0 {
 			ui64 -= 0x80000000
 			m[i] = ui64
-			offs =append(offs, ui64)
-			isLarge ++
+			offs = append(offs, ui64)
+			isLarge++
 		} else {
 			offs = append(offs, ui64)
 		}
@@ -342,17 +347,17 @@ func parseIdxFile(r io.ReadCloser) ([]idx, []byte, error) {
 	remB := bytes.NewReader(rem)
 	rChecks := io.NewSectionReader(remB, int64(len(rem)-40), 40)
 	_, err = rChecks.Read(pkCheck)
-	_, err = rChecks.Read(idxCheck);
+	_, err = rChecks.Read(idxCheck)
 	if isLarge != 0 {
 		rLarges := io.NewSectionReader(remB, 0, int64(len(rem)-40))
 		off := make([]byte, 8)
-		for k,v :=  range m {
+		for k, v := range m {
 			_, _ = rLarges.ReadAt(off, int64(v))
 			offs[k] = binary.BigEndian.Uint64(off)
 		}
 	}
 
-	for i,off := range offs {
+	for i, off := range offs {
 		idxes[i].offset = off
 	}
 
@@ -369,11 +374,9 @@ func parseIdxFile(r io.ReadCloser) ([]idx, []byte, error) {
 	return idxes, pkCheck, nil
 }
 
-
 func writePackFile() {
 
 }
-
 
 func decodeSize(r bufio.Reader) uint64 {
 	return 0

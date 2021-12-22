@@ -10,7 +10,10 @@ import (
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/OLUWAMUYIWA/got/internal/proto"
 )
+
 var sep byte = 0
 var nullstr = hex.EncodeToString([]byte{sep})
 var zeroId = hex.EncodeToString(make([]byte, 20))
@@ -28,17 +31,16 @@ var flushPacket = fmt.Sprintf("%.4x", 0)
 // ----
 
 type PktLine struct {
-	len int16
-	id string
+	len     int16
+	id      string
 	refname string
 	payload []byte
-
 }
 
 //pkt-line stream describing each ref and its current value
 type PktStream struct {
 	capabilities []string
-	stream []PktLine
+	stream       []PktLine
 }
 
 func decodePkts(stream []byte) PktStream {
@@ -54,20 +56,25 @@ func negotiatePkFile() {
 }
 
 // func sendReq(serviceName string) func(body io.Reader) {
-	
-// }
 
+// }
 
 func sendPostReq(url, uname, passwd string, body io.Reader) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, url, body)
 	if err != nil {
-		return nil, &ProtoErr{}
+		return nil, &proto.ProtoErr{
+			Context: "Network Error",
+			Inner:   err,
+		}
 	}
 	req.SetBasicAuth(uname, passwd)
 	cl := http.DefaultClient
 	resp, err := cl.Do(req)
 	if err != nil {
-		return nil, internal.NetworkErr.AddContext(err.Error())
+		return nil, &proto.ProtoErr{
+			Context: "Network Error",
+			Inner:   err,
+		}
 	}
 	return resp, nil
 }
@@ -75,12 +82,18 @@ func sendPostReq(url, uname, passwd string, body io.Reader) (*http.Response, err
 func sendGetReq(url, uname, passwd string) (*http.Response, error) {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return nil, internal.NetworkErr.AddContext(err.Error())
+		return nil, &proto.ProtoErr{
+			Context: "Network Error",
+			Inner:   err,
+		}
 	}
 	req.SetBasicAuth(uname, passwd)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, internal.NetworkErr.AddContext(err.Error())
+		return nil, &proto.ProtoErr{
+			Context: "Network Error",
+			Inner:   err,
+		}
 	}
 	return resp, nil
 }
@@ -93,29 +106,42 @@ func getRemoteMasterHash(url, uname, passwd string) (string, error) {
 	}
 	lines := decodePktResp(resp)
 	if lines[0] != "# service=git-receive-pack" {
-		return "", internal.FormatErr.AddContext(fmt.Sprintln("protocol error"))
+		return "", &proto.ProtoErr{
+			Context: "Network Error",
+			Inner:   err,
+		}
 	}
 	if lines[1] != "" {
-		return "", internal.FormatErr.AddContext(fmt.Sprintln("protocol error"))
+		return "", &proto.ProtoErr{
+			Context: "Network Error",
+			Inner:   err,
+		}
 	}
 	//TODO comeback.seems protocol has changed
 	if lines[2][:40] == "0000000000000000000000000000000000000000" {
 		//TODO
-		return "", internal.FormatErr.AddContext(fmt.Sprintln("protocol error"))
+		return "", &proto.ProtoErr{
+			Context: "Network Error",
+			Inner:   err,
+		}
 	}
 	splits := strings.SplitN(lines[2], " ", 2)
 	master_sha := splits[0]
 	master_ref := strings.SplitN(splits[1], fmt.Sprintf("\\0"), 2)[0]
 
 	if master_ref != "refs/heads/master" {
-		return "", internal.FormatErr.AddContext(fmt.Sprintln("protocol error"))
+		return "", &proto.ProtoErr{
+			Context: "Network Error",
+			Inner:   err,
+		}
 	}
 	if len(master_sha) != 40 {
-		return "", internal.FormatErr.AddContext(fmt.Sprintln("sha is bad"))
+		return "", &proto.ProtoErr{
+			Context: "SHA is bad",
+		}
 	}
 	return master_sha, nil
 }
-
 
 func decodePktResp(resp *http.Response) []string {
 	defer resp.Body.Close()
@@ -155,10 +181,9 @@ func encodePkt(strs []string) string {
 	return s.String()
 }
 
-
 func buildLines(lines []byte) []byte {
 	buff := new(bytes.Buffer)
-	for _, l :=  range lines {
+	for _, l := range lines {
 		buff.WriteString(fmt.Sprintf(""))
 		fmt.Println(l)
 	}

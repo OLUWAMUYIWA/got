@@ -138,15 +138,16 @@ func (got *Got) CatFile(prefix, mode string) {
 	}
 }
 
-
-
 //LsFiles prints to stdOut the state of staged files, i.e. the index files
 //After a Commit, it is clean
 func (got *Got) LsFiles(stage bool) {
 	if is, _ := IsGit(); !is {
 		got.logger.Fatalf("Not a valid git directory\n")
 	}
-	indexes := readIndexFile(got)
+	indexes, err := readIndexFile(got)
+	if err != nil {
+		got.FatalErr(err)
+	}
 	if len(indexes) != 0 {
 		got.logger.Printf("No staged files\n")
 		return
@@ -165,7 +166,7 @@ func (got *Got) LsFiles(stage bool) {
 			s := fmt.Sprintf("Mode: %o sha1: %x  stage: %d path: %s\n", mode, sha1, stage, path)
 			got.logger.Printf(s)
 		} else {
-			got.logger.Printf("%s\n",path)
+			got.logger.Printf("%s\n", path)
 		}
 	}
 }
@@ -197,10 +198,13 @@ func (got *Got) get_status() ([]string, []string, map[string]string) {
 	fmt.Println(files)
 	//sort the file paths
 	sort.Slice(files, func(i, j int) bool {
-		return files[i] < files[j] 
+		return files[i] < files[j]
 	})
 	//from the index we know files that are currently staged
-	index := readIndexFile(got)
+	index, err := readIndexFile(got)
+	if err != nil {
+		got.FatalErr(err)
+	}
 	var index_map map[string]Index
 	for _, ind := range index {
 		index_map[string(ind.path)] = ind
@@ -267,14 +271,16 @@ func (got *Got) status() {
 	}
 
 	for k, v := range mod {
-		d := diff(k, v)
+		d, err := diff([]byte(k), []byte(v))
+		if err != nil {
+			break
+		}
 		s.WriteString(fmt.Sprintf("%s\n", d))
 	}
 	_, err := fmt.Fprintf(os.Stdout, "%s\n", s.String())
 	got.GotErr(err)
 
 }
-
 
 //to write a tree, we need to stage the files first i.e. index them, then from the indexed files, we write the tree
 //TODO: for now, we support only root-level files
@@ -284,7 +290,10 @@ func (got *Got) WriteTree() (string, error) {
 		got.logger.Fatalf("Not a valid git directory\n")
 	}
 	// we need the mode, the path from root, and the sha1
-	indexes := readIndexFile(got)
+	indexes, err := readIndexFile(got)
+	if err != nil {
+		got.FatalErr(err)
+	}
 	if len(indexes) == 0 {
 		return "", fmt.Errorf("No files staged \n")
 	}
@@ -313,10 +322,10 @@ func (got *Got) deserTree(sha string) []treeItem {
 	_, ty, data, err := got.ReadObject(sha)
 	got.GotErr(err)
 	if ty != "tree" {
-		got.GotErr("should be tree object")
+		got.FatalErr(fmt.Errorf("should be tree object"))
 	}
 	if len(data) == 0 {
-		got.GotErr("data is empty")
+		got.FatalErr(fmt.Errorf("should be tree object"))
 	}
 	objs := make([]treeItem, 0)
 	var path, sha1 string
@@ -398,8 +407,6 @@ func (got *Got) missingObjs(localSha string, remoteSha string) []string {
 	}
 	return ret
 }
-
-
 
 //TODO
 //func (got *Got) Log() {}
