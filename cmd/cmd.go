@@ -12,7 +12,7 @@ func spec() {
 
 }
 
-func parse() {
+func Exec() {
 	init := flag.NewFlagSet("init", flag.ExitOnError)
 
 	add := flag.NewFlagSet("add", flag.ExitOnError)
