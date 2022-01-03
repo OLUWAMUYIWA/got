@@ -10,11 +10,16 @@ type Got struct {
 	logger  log.Logger
 }
 
+func (got *Got) WkDir() string {
+	return got.baseDir
+}
+
 const (
 	Sep   byte = 0
 	Space byte = ' '
 )
 
+//NewGot takes care of initializing our git object
 func NewGot(dir ...string) *Got {
 	baseDir := ""
 	if len(dir) == 0 {

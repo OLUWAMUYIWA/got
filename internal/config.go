@@ -179,3 +179,8 @@ func parseEmpty(count int) Line {
 		count: count,
 	}
 }
+
+//todo
+func Wkdir() string {
+	return ""
+}
