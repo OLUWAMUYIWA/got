@@ -124,8 +124,7 @@ func (got *Got) Commit(msg string) (string, error) {
 		return "", fmt.Errorf("Could not commit because: %w", err)
 	}
 	//get the parent sha from the HEAD file
-	head := InitRef(filepath.Join(got.baseDir))
-	parent, err := head.ReadCont()
+	parent, err := got.head.ReadCont()
 	if err != nil {
 		return "", fmt.Errorf("Commit error: %w", err)
 	}
@@ -186,8 +185,7 @@ func (got *Got) Push(url string) {
 			got.logger.Fatalln("error reading username and password")
 		}
 	}
-	head := InitRef(filepath.Join(got.baseDir))
-	localSha, err := head.ReadCont()
+	localSha, err := got.head.ReadCont()
 	remoteSha, err := proto.GetRemoteMasterHash(url, uname, passwd)
 	got.GotErr(err)
 	missings := got.missingObjs(string(localSha), remoteSha)

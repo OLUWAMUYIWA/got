@@ -14,6 +14,9 @@ import (
 	"github.com/OLUWAMUYIWA/got/internal/proto"
 )
 
+type HttpProto struct {
+}
+
 var sep byte = 0
 var nullstr = hex.EncodeToString([]byte{sep})
 var zeroId = hex.EncodeToString(make([]byte, 20))

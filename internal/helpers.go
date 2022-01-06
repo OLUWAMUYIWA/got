@@ -5,31 +5,13 @@ import (
 	"compress/zlib"
 	"crypto/sha1"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
-	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
 )
-
-//great, now I can remove every damn wkdir, I think.
-func IsGit() (bool, error) {
-	is := false
-	err := fs.WalkDir(os.DirFS("."), ".", func(path string, d fs.DirEntry, err error) error {
-		if d.IsDir() && d.Name() == ".git" {
-			is = true
-			return errors.New("done")
-		}
-		return nil
-	})
-	if errors.Is(err, errors.New("'done'")) {
-		err = nil
-	}
-	return is, err
-}
 
 //getConfig gets into got's config and gets the username and email
 //I chose to use json because reading and writing it is clean and easy. No stress
