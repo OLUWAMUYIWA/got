@@ -21,6 +21,8 @@ func Exec() {
 	config := flag.NewFlagSet("config", flag.ExitOnError)
 	diff := flag.NewFlagSet("diff", flag.ExitOnError)
 	hashObj := flag.NewFlagSet("hash-object", flag.ExitOnError)
+	fetch := flag.NewFlagSet("fetch", flag.ExitOnError)
+	lsFiles := flag.NewFlagSet("ls-files", flag.ExitOnError)
 	push := flag.NewFlagSet("push", flag.ExitOnError)
 	status := flag.NewFlagSet("status", flag.ExitOnError)
 	updInd := flag.NewFlagSet("update-index", flag.ExitOnError)
@@ -48,6 +50,10 @@ func Exec() {
 		diff.Parse(args[2:])
 	case "hash-object":
 		hashObj.Parse(args[2:])
+	case "fetch":
+		fetch.Parse(args[2:])
+	case "ls-files":
+		lsFiles.Parse(args[2:])
 	case "push":
 		push.Parse(args[2:])
 	case "status":
