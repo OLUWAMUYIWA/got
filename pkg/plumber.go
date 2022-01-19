@@ -103,21 +103,19 @@ func (got *Got) ReadObject(prefix string) (string, string, []byte, error) {
 }
 
 //CatFile displays the file info using the git logger (set as os.Stdout). It uses flags to determine what it displays
-func (got *Got) CatFile(prefix, mode string) {
-	//normalize
-	mode = strings.ToLower(mode)
-	if is, _ := IsGit(); !is {
-		got.logger.Fatalf("Not a valid git directory\n")
-	}
+func (got *Got) CatFile(prefix string, mode int) error{
+	
 	f_name, dType, data, err := got.ReadObject(prefix)
 	//this error should just cause the program to exit.
-	got.GotErr(err)
+	if err != nil {
+		return err
+	}
 	switch mode {
-	case "size":
+	case 0:
 		got.logger.Printf("File %s: Size: %d\n", f_name, len(data))
-	case "type":
+	case 1:
 		got.logger.Printf("File %s Type: %s\n", f_name, dType)
-	case "pretty":
+	case 2:
 		if dType == "commit" || dType == "blob" {
 			got.logger.Printf("Content %s: \n%s", f_name, string(data))
 		} else if dType == "tree" {
@@ -125,12 +123,14 @@ func (got *Got) CatFile(prefix, mode string) {
 			got.logger.Printf("Directory: \n")
 			objs := got.deserTree(prefix)
 			for _, obj := range objs {
-				got.CatFile(obj.sha1, "pretty")
+				got.CatFile(obj.sha1, 2)
 			}
 		}
 	default:
 		got.logger.Fatalf("Bad flag mode. Check again, must be either size, type, pretty \n")
 	}
+
+	return nil
 }
 
 //LsFiles prints to stdOut the state of staged files, i.e. the index files

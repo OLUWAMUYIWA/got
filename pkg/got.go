@@ -45,8 +45,8 @@ func NewGot() *Got {
 		log.Fatalf("Error while reading the HEAD file: %s\n", err)
 	}
 
-	logger := log.New(os.Stdout, "GOT: ", log.Default().Flags())
-	logger.Printf("Got: ")
+	logger := log.New(os.Stdout, "GOT library: ", log.Ldate | log.Ltime)
+	logger.Println("Got Library: ")
 	return &Got{baseDir: baseDir, logger: logger, head: head}
 }
 

@@ -29,11 +29,10 @@ var (
 
 	
 )
-func argsIncomplete() func() error {
-	return func() error {
+func ArgsIncomplete()  error {
 		argsIncompleteErr := &OpErr{Context: "Argument not complete"}
 		return argsIncompleteErr
-	}
+	
 }
 
 func (e *OpErr) Unwrap() error {

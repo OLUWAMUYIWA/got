@@ -77,6 +77,9 @@ func (got *Got) Status() {
 }
 
 
+// Add updates the index using the current content found in the working tree, to prepare the content staged for the next commit.
+//provide full paths please
+//comebck: move parsing problems to cmd
 func (got *Got) Add(all bool, args ...string) error {
 	switch len(args) {
 	case 0: {
@@ -84,8 +87,8 @@ func (got *Got) Add(all bool, args ...string) error {
 			return got.addAll()
 		}
 		//else
-		errFunc := argsIncomplete()
-		return errFunc()
+		return ArgsIncomplete()
+		
 	}
 	case 1: {
 		if args[1] == "." {
@@ -160,10 +163,20 @@ func (got *Got) addPaths(paths []string) error {
 	return nil
 }
 
+//comeback
+
+// Rm remove files matching pathspec from the index, or from the working tree and the index
+//provide full paths please
+func (g *Got) Rm(paths ...string) error {
+	return nil
+}
+
+
 //https://github.com/git/git/blob/master/Documentation/technical/http-protocol.txt
 //https://github.com/git/git/blob/master/Documentation/technical/pack-protocol.txt
 //Commit first writes the tree from the set of staged objects
 //we have no  commit-tree method
+//comeback to fix the method. we need a way to writ the committed changes to stdout
 func (got *Got) Commit(msg string) (string, error) {
 	if is, _ := IsGit(); !is {
 		got.logger.Fatalf("Not a valid git directory\n")
