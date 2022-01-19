@@ -1,5 +1,9 @@
 # got
-a minimal git client in go
+a minimal git client in go. 
+It uses no other dependency other than `assert` for testing. Everything else is from the `go standard library`
+I implement algorithms like `crc`, `myer's diff`, `x-delta`, and the `git protocol (http and ssh)` from scratch.
+I took testing and error handling a little seriously for a side project, mostly because I wanted to learn how tose things work in `go`.
+I also witched from `go 1.6` to `go 1.18beta` to take advantage of the new `generics` introduced in `go`. The two major things i wwish `go` had, compared to `rust` are `iterators` and `macros`, now that `go` has `generics`
 
 In implementing this client, I used only one external package.
 I'm a Go developer interested in learning how things work at the lower level.
@@ -8,7 +12,7 @@ If you're looking at this anywhere in the world, please check the code out and s
 there are design or implementatioon changes I could make to improve it. I would love to learn from you.
 I did well to read *Effective Go* several times over to check the quality of the code, 
 but surely there are places where I could make it better. 
-This client is not for production use, as it would fail you in so many ways. You may use it for any other purpose.
+This client is not for production use, as it would fail you in so many ways. You may use it to learn, however.
 Hack on it, submit PRs, hopefully we can have fun together.
 For devs who wish to learn from this implementation, I made the code quite readable, and punctuated it 
 heavily with comments. It shouldn't be hard to find your way around it. If you need help, please let me know by raising an issue.

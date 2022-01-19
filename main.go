@@ -16,9 +16,12 @@ limitations under the License.
 package main
 
 import (
+	"os"
+
 	"github.com/OLUWAMUYIWA/got/cmd"
 )
 
 func main() {
-	cmd.Exec()
+	os.Exit(cmd.Exec())
+	
 }

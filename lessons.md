@@ -1,4 +1,4 @@
 # Why use methods?
-- It localized optimization
+- It localizes optimization
 - It localizes errors
 - It abstracts computation

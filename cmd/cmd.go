@@ -5,76 +5,137 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/OLUWAMUYIWA/got/internal"
+	"github.com/OLUWAMUYIWA/got/pkg"
 )
 
-func spec() {
+type app struct {
 
 }
 
-func Exec() {
-	init := flag.NewFlagSet("init", flag.ExitOnError)
+func (a app) parseArgs() {
+	
 
-	add := flag.NewFlagSet("add", flag.ExitOnError)
-	cat := flag.NewFlagSet("cat-file", flag.ExitOnError)
-	commit := flag.NewFlagSet("commit", flag.ExitOnError)
-	config := flag.NewFlagSet("config", flag.ExitOnError)
-	diff := flag.NewFlagSet("diff", flag.ExitOnError)
-	hashObj := flag.NewFlagSet("hash-object", flag.ExitOnError)
-	fetch := flag.NewFlagSet("fetch", flag.ExitOnError)
-	lsFiles := flag.NewFlagSet("ls-files", flag.ExitOnError)
-	push := flag.NewFlagSet("push", flag.ExitOnError)
-	status := flag.NewFlagSet("status", flag.ExitOnError)
-	updInd := flag.NewFlagSet("update-index", flag.ExitOnError)
-	pull := flag.NewFlagSet("pull", flag.ExitOnError)
+}
+
+func (a app) run() {
+
+}
+
+//comeback handle exit codes
+func Exec() int {
+
+
+	//each subcommand has its own flagset
+	initCmd := flag.NewFlagSet("init", flag.ExitOnError)
+
+
+	addCmd := flag.NewFlagSet("add", flag.ExitOnError)
+	var addFlag bool
+	addCmd.BoolVar(&addFlag, "all", false, "Specify that all files starting from root directory should de added")
+	addCmd.BoolVar(&addFlag, "A", false, "Specify that all files starting from root directory should de added (shorthand)")
+
+	catCmd := flag.NewFlagSet("cat-file", flag.ExitOnError)
+	
+
+	commitCmd := flag.NewFlagSet("commit", flag.ExitOnError)
+	
+
+	configCmd := flag.NewFlagSet("config", flag.ExitOnError)
+	
+
+	diffCmd := flag.NewFlagSet("diff", flag.ExitOnError)
+	
+
+	hashObjCmd := flag.NewFlagSet("hash-object", flag.ExitOnError)
+	
+
+	fetchCmd := flag.NewFlagSet("fetch", flag.ExitOnError)
+	
+
+	lsFilesCmd := flag.NewFlagSet("ls-files", flag.ExitOnError)
+	
+
+	pushCmd := flag.NewFlagSet("push", flag.ExitOnError)
+	
+
+	statusCmd := flag.NewFlagSet("status", flag.ExitOnError)
+	
+
+	updIndCmd := flag.NewFlagSet("update-index", flag.ExitOnError)
+	
+
+	pullCmd := flag.NewFlagSet("pull", flag.ExitOnError)
 
 	flag.Parse()
+
 	args := flag.Args()
+	
 	if len(args) < 2 {
 		fmt.Fprintf(os.Stderr, "No subcommand provided for git to work with")
-		os.Exit(1)
+		return 1
 	}
 
+
+	//parse each of the subcommands, starting from the second argument.
+	//remember that args[0] will be the program binary name
+	//args[1] is our subcommand.
 	switch args[1] {
 	case "init":
-		init.Parse(args[2:])
+		initCmd.Parse(args[2:])
 	case "add":
-		add.Parse(args[2:])
+		addCmd.Parse(args[2:])
 	case "cat-file":
-		cat.Parse(args[2:])
+		catCmd.Parse(args[2:])
 	case "commit":
-		commit.Parse(args[2:])
+		commitCmd.Parse(args[2:])
 	case "config":
-		config.Parse(args[2:])
+		configCmd.Parse(args[2:])
 	case "diff":
-		diff.Parse(args[2:])
+		diffCmd.Parse(args[2:])
 	case "hash-object":
-		hashObj.Parse(args[2:])
+		hashObjCmd.Parse(args[2:])
 	case "fetch":
-		fetch.Parse(args[2:])
+		fetchCmd.Parse(args[2:])
 	case "ls-files":
-		lsFiles.Parse(args[2:])
+		lsFilesCmd.Parse(args[2:])
 	case "push":
-		push.Parse(args[2:])
+		pushCmd.Parse(args[2:])
 	case "status":
-		status.Parse(args[2:])
+		statusCmd.Parse(args[2:])
 	case "update-index":
-		updInd.Parse(args[2:])
+		updIndCmd.Parse(args[2:])
 	case "pull":
-		pull.Parse(args[2:])
+		pullCmd.Parse(args[2:])
+	default:
+		return 1
 	}
-	var got *internal.Got
 
-	//now we have togo through each of the subcommands to know the one that was passed. we then execute our program logic
-	if init.Parsed() {
-		if len(args) < 3 {
-			fmt.Fprintf(os.Stderr, "Init needs  the directorsy specified as an argument. \n. If this is the wkdir, put .")
-			os.Exit(1)
+	args = args[2:] //update args to no longer having the app name and the command name
+	
+	
+
+	//now we have to go through each of the subcommands to know the one that was passed. we then execute our program logic
+	if initCmd.Parsed() {
+		if len(args) < 1 { //no path argument
+			fmt.Fprintf(os.Stderr, "Init needs  the directory specified as an argument. \n. If this is the wkdir, put .")
+			return 1
 		}
-		wkdir := args[2]
-		got = internal.NewGot(wkdir)
-		got.Init(got.WkDir())
-	} else { //workspace has already been initialized and its wkdir has been saved in our sonfig file
-		got = internal.NewGot(internal.Wkdir())
+		wkdir := args[0]
+		if err := pkg.Init(wkdir); err != nil {
+			return 1
+		}
 	}
+
+	//not an initialization, so NewGot() shound be valid
+	got := pkg.NewGot()
+	if addCmd.Parsed() {
+		if err := got.Add(addFlag, args...); err != nil {
+			return 1
+		}
+
+	} else { //workspace has already been initialized and its wkdir has been saved in our sonfig file
+		
+	}
+
+	return 0
 }
