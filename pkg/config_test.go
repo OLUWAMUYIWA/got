@@ -1,4 +1,4 @@
-package pkg_test
+package pkg
 
 import (
 	"bytes"
@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/OLUWAMUYIWA/got/pkg"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -16,9 +15,9 @@ import (
 func TestConfig(t *testing.T) {
 	assert := assert.New(t)
 
-	co := pkg.User{"oluwamuyiwa", "onigbs@gmail.com"}
+	co := User{"oluwamuyiwa", "onigbs@gmail.com"}
 
-	err := pkg.Config(co)
+	err := Config(co)
 
 	if assert.NoError(err, "Could not evn run config successfully: %v", err) {
 		if dir, err := os.UserCacheDir(); assert.Nil(err, "Error opening UserCache: %v", err) {
@@ -26,7 +25,7 @@ func TestConfig(t *testing.T) {
 			if assert.NoError(err, "Could not read file system: %v", err) {
 				buf := bytes.NewReader(b)
 				dec := json.NewDecoder(buf)
-				var conf pkg.User
+				var conf User
 				if err := dec.Decode(&conf); assert.NoError(err, "error while decoding json") {
 					require.Equal(t, co, conf, "What is stored is not what we read")
 				}

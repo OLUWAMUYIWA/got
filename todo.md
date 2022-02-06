@@ -19,3 +19,5 @@
 
         // ... use specificError later.
 ```
+
+- make the pkg module return streams as messages instead of printing directly to os.Stdout. Its better that way if we want to be more general.

@@ -22,17 +22,7 @@ func (a app) run() {
 }
 
 //comeback handle exit codes
-func (a *app) parseArgs() (runner, error) {
-
-	// initializing & configuration
-	// init
-	initCmd := flag.NewFlagSet("init", flag.ExitOnError)
-	
-	//config
-	configCmd := flag.NewFlagSet("config", flag.ExitOnError)
-	
-
-	// snapshotting
+func (a *app) parseArgs() (runner, error) {	
 
 	// add
 	addCmd := flag.NewFlagSet("add", flag.ExitOnError)
@@ -40,46 +30,8 @@ func (a *app) parseArgs() (runner, error) {
 	addCmd.BoolVar(&addFlag, "all", false, "Specify that all files starting from root directory should de added")
 	addCmd.BoolVar(&addFlag, "A", false, "Specify that all files starting from root directory should de added (shorthand)")
 
-	// status
-	statusCmd := flag.NewFlagSet("status", flag.ExitOnError)
 
-	// rm
-	rmvCmd := flag.NewFlagSet("rm", flag.ExitOnError)
-
-	// commit
-	// supports only the first two ways of committing as described in https://git-scm.com/docs/git-commit
-	// it expexts that an `add` has already been run, or a `rm` after an `add`.
-	commitCmd := flag.NewFlagSet("commit", flag.ExitOnError)
-	var cmtMsg string 
-	commitCmd.StringVar(&cmtMsg, "m", "update", "commit after add or remove" )
-
-
-
-	// inspection
-
-	//diff
-	diffCmd := flag.NewFlagSet("diff", flag.ExitOnError)
-	
-
-
-	// sharing
-	
-	// fetch
-	fetchCmd := flag.NewFlagSet("fetch", flag.ExitOnError)
-
-	// pull
-	pullCmd := flag.NewFlagSet("pull", flag.ExitOnError)
-	
-	// push
-	pushCmd := flag.NewFlagSet("push", flag.ExitOnError)
-
-	// remote
-	rmtCmd := flag.NewFlagSet("remote", flag.ExitOnError)
-
-	
-
-
-	//plumbing
+	branchCmd := flag.NewFlagSet("branch", flag.ExitOnError)
 
 	//cat
 	catCmd := flag.NewFlagSet("cat-file", flag.ExitOnError)
@@ -88,14 +40,65 @@ func (a *app) parseArgs() (runner, error) {
 	catCmd.BoolVar(&size, "s", false, "specify that we only need the size" )
 	catCmd.BoolVar(&pretty, "p", false, "specify that we nned pretty printing" )
 
-	//ls-files
+
+	// commit
+	// supports only the first two ways of committing as described in https://git-scm.com/docs/git-commit
+	// it expexts that an `add` has already been run, or a `rm` after an `add`.
+	commitCmd := flag.NewFlagSet("commit", flag.ExitOnError)
+	var cmtMsg string 
+	commitCmd.StringVar(&cmtMsg, "m", "update", "commit after add or remove" )
+
+	// config
+	configCmd := flag.NewFlagSet("config", flag.ExitOnError)
+
+
+	// diff
+	diffCmd := flag.NewFlagSet("diff", flag.ExitOnError)
+
+
+	// fetch
+	fetchCmd := flag.NewFlagSet("fetch", flag.ExitOnError)
+
+	// hash-object
+	hashObjCmd := flag.NewFlagSet("hash-object", flag.ExitOnError)
+
+	// initializing & configuration
+	// init
+	initCmd := flag.NewFlagSet("init", flag.ExitOnError)
+	
+	// ls-files
 	lsFilesCmd := flag.NewFlagSet("ls-files", flag.ExitOnError)
 
 	//ls-tree 
 	lsTreeCmd := flag.NewFlagSet("ls-tree", flag.ExitOnError)
 
+	mergeCmd := flag.NewFlagSet("merge", flag.ExitOnError)
+
+	// pull
+	pullCmd := flag.NewFlagSet("pull", flag.ExitOnError)
+	
+	// push
+	pushCmd := flag.NewFlagSet("push", flag.ExitOnError)
+
 	//read-tree
 	readTreeCmd := flag.NewFlagSet("read-tree", flag.ExitOnError)
+
+	// remote
+	rmtCmd := flag.NewFlagSet("remote", flag.ExitOnError)
+	
+	// rm
+	rmvCmd := flag.NewFlagSet("rm", flag.ExitOnError)
+
+	// status
+	statusCmd := flag.NewFlagSet("status", flag.ExitOnError)
+	
+	//switch
+	switchCmd := flag.NewFlagSet("switch", flag.ExitOnError)
+	var Sname string
+	switchCmd.StringVar(&Sname, "c", "", "Creates a new branch and checks it out")
+
+	// update-index
+	updIndCmd := flag.NewFlagSet("update-index", flag.ExitOnError)
 
 	//verify-pack
 	verifyPackCmd := flag.NewFlagSet("verify-pack", flag.ExitOnError)
@@ -103,11 +106,7 @@ func (a *app) parseArgs() (runner, error) {
 	//write-tree
 	writeTreeCmd := flag.NewFlagSet("write-tree", flag.ExitOnError)
 
-	//hash-object
-	hashObjCmd := flag.NewFlagSet("hash-object", flag.ExitOnError)
 
-	//update-index
-	updIndCmd := flag.NewFlagSet("update-index", flag.ExitOnError)
 
 	flag.Parse()
 
@@ -122,10 +121,11 @@ func (a *app) parseArgs() (runner, error) {
 	//remember that args[0] will be the program binary name
 	//args[1] is our subcommand.
 	switch args[1] {
-		case "init":
-			initCmd.Parse(args[2:])
+		
 		case "add":
 			addCmd.Parse(args[2:])
+		case "branch": 
+			branchCmd.Parse(args[2:])
 		case "cat-file":
 			catCmd.Parse(args[2:])
 		case "commit":
@@ -134,30 +134,36 @@ func (a *app) parseArgs() (runner, error) {
 			configCmd.Parse(args[2:])
 		case "diff":
 			diffCmd.Parse(args[2:])
-		case "hash-object":
-			hashObjCmd.Parse(args[2:])
 		case "fetch":
 			fetchCmd.Parse(args[2:])
+		case "hash-object":
+			hashObjCmd.Parse(args[2:])
+		case "init":
+			initCmd.Parse(args[2:])
 		case "ls-files":
 			lsFilesCmd.Parse(args[2:])
 		case "ls-tree":
 			lsTreeCmd.Parse(args[2:])
-		case "push":
-			pushCmd.Parse(args[2:])
-		case "remote":
-			rmtCmd.Parse(args[2:])
-		case "verify-pack":
-			verifyPackCmd.Parse(args[2:])
-		case "read-tree":
-			readTreeCmd.Parse(args[2:])
-		case "write-tree":
-			writeTreeCmd.Parse(args[2:])
-		case "status":
-			statusCmd.Parse(args[2:])
-		case "update-index":
-			updIndCmd.Parse(args[2:])
+		case "merge": 
+			mergeCmd.Parse(args[2:])
 		case "pull":
 			pullCmd.Parse(args[2:])
+		case "push":
+			pushCmd.Parse(args[2:])
+		case "read-tree":
+			readTreeCmd.Parse(args[2:])
+		case "remote":
+			rmtCmd.Parse(args[2:])
+		case "status":
+			statusCmd.Parse(args[2:])
+		case "switch":
+			switchCmd.Parse(args[2:])
+		case "update-index":
+			updIndCmd.Parse(args[2:])
+		case "verify-pack":
+			verifyPackCmd.Parse(args[2:])
+		case "write-tree":
+			writeTreeCmd.Parse(args[2:])
 		default:
 			return nil, fmt.Errorf("Error parrsing flags and args")
 	}
@@ -171,7 +177,7 @@ func (a *app) parseArgs() (runner, error) {
 			
 		}
 		wkdir := args[0]
-		return &ini{
+		return &initializer{
 			wkdir,
 		}, nil
 	}
@@ -184,6 +190,16 @@ func (a *app) parseArgs() (runner, error) {
 		}, nil
 
 	} 
+
+	case branchCmd.Parsed(): {
+		name := branchCmd.Arg(0)
+		
+		b := branch {
+			name: name,
+
+		}
+	} 
+
 	case rmvCmd.Parsed(): {
 		if len(args) > 0 {
 			return &rm {

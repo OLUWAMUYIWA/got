@@ -23,23 +23,32 @@ const TIME_FORMAT = "Mon Jan 2 15:04:05 2006 -0700"
 //Check: https://stackoverflow.com/questions/35894613/how-to-disallow-access-to-a-file-for-one-user/35895436#35895436 on file permissions
 //Init creates a directory for your repo and initializes the hidden .git directory
 func Init(name string) error {
-	if err := os.Mkdir(name, 0777); err != nil {
-		return err
+	n := ".git"
+	if name == "" {
+		if is, _ := IsGit(); is {
+			return fmt.Errorf("Its already a git directory")
+		}
+	} else {
+		if err := os.Mkdir(name, 0777); err != nil {
+			return err
+		}
+		n = filepath.Join(name, ".git")
 	}
+	
+	
 	//MkdirAll is just perfect because it creates directories on all the paths
-	l := filepath.Join(name, ".git")
-	fmt.Println(l)
-	if err := os.MkdirAll(filepath.Join(name, ".git"), 0777); err != nil {
+	
+	if err := os.MkdirAll(n, 0777); err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Join(name, ".git", "objects"), 0777); err != nil {
+	if err := os.MkdirAll(filepath.Join(n, "objects"), 0777); err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Join(name, ".git", "refs", "heads"), 0777); err != nil {
+	if err := os.MkdirAll(filepath.Join(n, "refs", "heads"), 0777); err != nil {
 		return err
 	}
 	//we create the HEAD file, a pointer to the current branch
-	headPath := filepath.Join(name, ".git", "HEAD")
+	headPath := filepath.Join(n, "HEAD")
 	if _, err := os.Create(headPath); err != nil {
 		return err
 	}

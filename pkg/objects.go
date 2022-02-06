@@ -8,9 +8,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 type ObjectType int
@@ -19,14 +22,24 @@ const (
 	blob ObjectType = 1 << iota
 	tree
 	commit
+	tag
 )
 
 type ObjectErr struct {
 	ErrSTring string
+	inner error
 }
 
 func (e *ObjectErr) Error() string {
 	return e.ErrSTring
+}
+
+func (e *ObjectErr) Unwrap() error {
+	return e.inner
+}
+
+func (e *ObjectErr) SetInner(err error) {
+	e.inner = err
 }
 
 type Hasher interface {
@@ -38,9 +51,69 @@ type GotObject interface {
 	Type() string
 }
 
-// func parseObject() GotObject {
+//an object could be a commit, tree, blob, or tag
+func parseObject(sha string, got *Got) (*GotObject, error) {
+	// first we check the packfiles to see if the object is among the parsed
 
-// }
+	//then we check the git object directory
+}
+
+//!!!!COMMIT OBJECT AND ITS GOTOBJECT IMPLEMENTATION!!!!!
+type commitObj struct {
+	sha  string
+	data []byte
+}
+
+type Sign struct {
+	name, email string
+	time time.Time
+}
+
+type Comm struct {
+	sha [20]byte
+	parents [][20] byte
+	committer Sign
+	author Sign
+	msg string
+	pgp string
+}
+
+func (c *commitObj) Hash(wkdir string) ([]byte, error) {
+	b, err := HashObj(c.Type(), c.data, wkdir)
+	if err != nil {
+		c.sha = hex.EncodeToString(b)
+		return b, nil
+	}
+	return nil, fmt.Errorf("Could not hash commit obect: %w", err)
+}
+
+func (c *commitObj) Type() string {
+	return "commit"
+}
+
+func parseCommit(rdr io.Reader, got *Got) (*Comm, error) {
+	//TODO
+	r := bufio.NewReader(rdr)
+
+
+	c := &Comm{}
+	return c, nil
+}
+
+//!!!!TREE OBJECT AND ITS GOTOBJECT IMPLEMENTATION!!!!!
+type treeObj struct {
+	sha      string
+	subTrees []treeItem
+	blobs    []treeItem
+	data     []byte
+}
+
+//Object is a composite datatype representing any of the three types in the git obects directory: blobs, trees, commits
+type treeItem struct {
+	mode uint64
+	path string
+	sha1 string
+}
 
 func parseTree(rdr io.Reader, got *Got) (treeObj, error) {
 	tree := treeObj{
@@ -102,45 +175,6 @@ func parseTree(rdr io.Reader, got *Got) (treeObj, error) {
 	return tree, nil
 }
 
-//!!!!COMMIT OBJECT AND ITS GOTOBJECT IMPLEMENTATION!!!!!
-type commitObj struct {
-	sha  string
-	data []byte
-}
-
-func (c *commitObj) Hash(wkdir string) ([]byte, error) {
-	b, err := HashObj(c.Type(), c.data, wkdir)
-	if err != nil {
-		c.sha = hex.EncodeToString(b)
-		return b, nil
-	}
-	return nil, fmt.Errorf("Could not hash commit obect: %w", err)
-}
-
-func (c *commitObj) Type() string {
-	return "commit"
-}
-
-func parseCommit(rdr io.Reader, got *Got) (commitObj, error) {
-	//TODO
-	_ = bufio.NewReader(rdr)
-	return commitObj{}, nil
-}
-
-//!!!!TREE OBJECT AND ITS GOTOBJECT IMPLEMENTATION!!!!!
-type treeObj struct {
-	sha      string
-	subTrees []treeItem
-	blobs    []treeItem
-	data     []byte
-}
-
-//Object is a composite datatype representing any of the three types in the git obects directory: blobs, trees, commits
-type treeItem struct {
-	mode uint64
-	path string
-	sha1 string
-}
 
 func (t *treeObj) Hash(wkdir string) ([]byte, error) {
 	b, err := HashObj(t.Type(), t.data, wkdir)
@@ -158,6 +192,7 @@ func (c *treeObj) Type() string {
 //!!!!BLOB OBJECT AND ITS GOTOBJECT IMPLEMENTATION!!!!!
 type blobObj struct {
 	sha  string
+	size int
 	data []byte
 }
 
@@ -170,9 +205,24 @@ func (c *blobObj) Type() string {
 }
 
 func parseBlob(rdr io.Reader, got *Got) (blobObj, error) {
-	//TODO
-	return blobObj{}, nil
+	b := bufio.NewReader(rdr)
+	var d bytes.Buffer
+	blob := &blobObj{}
+	if ty, err := b.ReadBytes(' '); err != nil {
+		if len, err := b.ReadBytes(Sep); err != nil {
+			blob.size = int(binary.BigEndian.Uint32(len)) //comeback
+			if _, err := io.CopyN(d, b, int64(blob.size)) {
+				blob.data = d.Bytes()
+				return blob, nil
+			}
+		}
+	}
+	return  nil, fmt.Errorf("Error reading blob")
 }
+
+
+
+
 
 //general hashfunction
 func HashObj(ty string, data []byte, base string) ([]byte, error) {
@@ -243,11 +293,58 @@ func (g *Got) OpenWrite() error {
 	return fmt.Errorf("")
 }
 
-func (got *Got) Object(sha string) {
+func (got *Got) Object(sha string, ty ObjectType) (*GotObject, error){
+	// try pack
 
+	//try object directory
+	b, err := fs.ReadFile(os.DirFS(filepath.Join(got.WkDir(), ".git", sha[0:2])), shap[2:])
+	if err != nil {
+		return nil, err
+	} 
+
+	objRdr := bytes.NewReader(b)
+
+	switch ty {
+		case blob: {
+			return parseBlob(objRdr, got)
+		}
+
+		case tree: {
+			return parseTree(objRdr, got)
+		}
+		
+		case commit: {
+			return parseCommit(objRdr, got)
+		}	
+
+		case tag: {
+			parseTag(objRdr, got)
+		}
+	}
+	return nil
 }
 
 type gotObject struct {
 	ty  ObjectType
 	obj GotObject
+}
+
+
+
+type tagObj struct {
+	name string
+}
+
+
+func (t *tagObj) Hash(wkdir string) ([]byte, error) {
+	return nil, nil
+}
+
+
+func (t *tagObj) Type() string {
+	return "tag"
+}
+
+func parseTag(r io.Reader, g *Got) (*tagObj, error) {
+	return nil, nil
 }

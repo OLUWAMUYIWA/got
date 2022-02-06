@@ -54,6 +54,12 @@ const (
 	emt                          //empty line
 )
 
+//default RefSpecs
+const (
+	FetchRefSpec = "+refs/heads/*:refs/remotes/%s/*"
+	PushRefSpec = "refs/heads/*:refs/heads/*"
+)
+
 var (
 	rCmt   = regexp.MustCompile(`(?m)^\s*(?P<cmt>[#;]\w+)$`)
 	rEmt   = regexp.MustCompile(`(?m)^\s*$`)
@@ -62,7 +68,7 @@ var (
 	rKv    = regexp.MustCompile(`(?im)\A\s*(?P<key>[[:alpha:]]\w*)\s*=\s*(?P<val>\w+)\s*(?P<cmt>#\s*\w\s*)?$`)
 )
 
-type ConfigObj struct {
+type ConfigParse struct {
 	sections map[string]Section
 }
 
@@ -98,7 +104,7 @@ func newSect(sectCount int) Section {
 		subs:  []Line{},
 	}
 }
-func parseConfig(basepath string) (*ConfigObj, error) {
+func parseConfig(basepath string) (*ConfigParse, error) {
 	// root, err := os.UserCacheDir()
 	//conf := filepath.Join(path, ".git")
 	data, err := fs.ReadFile(os.DirFS(basepath), ".config")
@@ -182,7 +188,7 @@ func parseEmpty(count int) Line {
 	}
 }
 
-func (conf *ConfigObj) add(k, v string) error {
+func (conf *ConfigParse) add(k, v string) error {
 	splits := strings.Split(k, ".")
 	key, rest := splits[0], splits[1:]
 	sect, ok := conf.sections[key]
@@ -227,10 +233,10 @@ func (conf *ConfigObj) add(k, v string) error {
 }
 
 //todo: use the sorted keys trick to sort the map based on the keys here
-func (conf *ConfigObj) Save() error {
+func (conf *ConfigParse) Save() error {
 	return nil
 }
 
-func InitCinfig(path string) (*ConfigObj, error) {
+func InitCinfig(path string) (*ConfigParse, error) {
 	return nil, nil
 }

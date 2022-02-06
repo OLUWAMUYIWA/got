@@ -7,11 +7,11 @@ type runner interface {
 	run() error
 }
 
-type ini struct{
+type initializer struct{
 	wkdir string
 }
 
-func (i *ini) run() error {
+func (i *initializer) run() error {
 	return  pkg.Init((*i).wkdir)
 }
 
@@ -58,4 +58,22 @@ type cat struct {
 func(c *cat) run() error {
 	got := pkg.NewGot()
 	return got.CatFile((*c).prefix, (*c).mode)
+}
+
+type branch struct {
+	name string
+	delete bool
+}
+
+func (b *branch) run() error {
+	return nil
+}
+
+type _switch struct {
+	name string
+	new bool
+}
+
+func (s *_switch) run() error {
+	return nil
 }
