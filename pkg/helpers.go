@@ -135,9 +135,9 @@ func uvarint(r io.Reader) (uint64, error) {
 	}
 }
 
-//had to repeat this here to avoid cyclic dependencies
-//checks if the kth bit is set. contract: n <= 255. indexed beginning from zero
-func isKthSet(i uint8, k int) bool {
-	mask := uint8(1) << k
-	return (i & mask) != 0
-}
+// //had to repeat this here to avoid cyclic dependencies
+// //checks if the kth bit is set. contract: n <= 255. indexed beginning from zero
+// func isKthSet(i uint8, k int) bool {
+// 	mask := uint8(1) << k
+// 	return (i & mask) != 0
+// }

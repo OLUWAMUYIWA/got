@@ -294,7 +294,7 @@ func (got *Got) WriteTree() (string, error) {
 		s := fmt.Sprintf("%o %s%v%v", mode, ind.path, Sep, ind.sha1_obj_id)
 		b.Write([]byte(s))
 	}
-	tree := treeObj{
+	tree := Tree{
 		data: b.Bytes(),
 	}
 	hash, err := tree.Hash(got.baseDir)

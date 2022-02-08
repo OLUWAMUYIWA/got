@@ -12,6 +12,27 @@ import (
 	"io"
 )
 
+type PackErr struct {
+	Context string
+	Inner   error
+}
+
+var (
+	GenericNetErr = &PackErr{Context: "Pack File Error"}
+)
+
+func (p *PackErr) Error() string {
+	if p.Inner != nil {
+		return fmt.Sprintf("Pack File Error: %v\nInner:%s", p.Context, p.Inner)
+	}
+	return fmt.Sprintf("Pack File Error: %s\n", p.Context)
+}
+
+func (p *PackErr) Unwrap() error {
+	return p.Inner
+}
+
+
 //IMPORTANT:
 //source: https://github.com/git/git/blob/master/Documentation/technical/pack-format.txt
 
@@ -98,7 +119,7 @@ func parsePackFile(pack, idx io.ReadSeekCloser) (Pack, error) {
 
 	sig := "PACK"
 	if bytes.Compare([]byte(sig), hdr[0:4]) != 0 {
-		return Pack{}, &ProtoErr{Context: "not a valid pack file, Signature is not PACK as was expected"}
+		return Pack{}, &PackErr{Context: "not a valid pack file, Signature is not PACK as was expected"}
 	}
 	//chose uint64 to prevent overflow
 	version := binary.BigEndian.Uint64(hdr[4:8])
@@ -111,7 +132,7 @@ func parsePackFile(pack, idx io.ReadSeekCloser) (Pack, error) {
 		return Pack{}, fmt.Errorf("idx file and pack file disagree on number of objects")
 	}
 	if n != 12 {
-		return Pack{}, &ProtoErr{Context: "header not up to 12 bytes, check"}
+		return Pack{}, &PackErr{Context: "header not up to 12 bytes, check"}
 	}
 	packs := make(map[string]*pkObject)
 	for _, idx := range idxes {
@@ -125,7 +146,7 @@ func parsePackFile(pack, idx io.ReadSeekCloser) (Pack, error) {
 		for {
 			_, err := pack.Read(buf)
 			if err != nil {
-				return Pack{}, &ProtoErr{Context: "Error reading pack_file", Inner: err}
+				return Pack{}, &PackErr{Context: "Error reading pack_file", Inner: err}
 			}
 			meta = append(meta, buf[0])
 			if !isKthSet(buf[0], 7) {
