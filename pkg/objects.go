@@ -171,4 +171,8 @@ type gotObject struct {
 }
 
 
+func (o *gotObject) parse() {
+	
+}
+
 

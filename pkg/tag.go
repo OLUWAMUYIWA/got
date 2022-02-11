@@ -7,7 +7,7 @@ type tagRaw struct {
 }
 
 type Tag struct {
-	
+	id string
 }
 
 
