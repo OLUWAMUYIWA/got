@@ -61,6 +61,11 @@ func Init(name string) error {
 }
 
 
+//comeback
+func (g *Got) Diff(cached bool, output, arg string) error {
+	return nil
+}
+
 
 func (got *Got) Status() {
 	if is, _ := IsGit(); !is {
@@ -186,7 +191,8 @@ func (g *Got) Rm(paths ...string) error {
 //Commit first writes the tree from the set of staged objects
 //we have no  commit-tree method
 //comeback to fix the method. we need a way to writ the committed changes to stdout
-func (got *Got) Commit(msg string) (string, error) {
+// comeback `all` determines whether all known files (already in index) is automatically committed
+func (got *Got) Commit(msg string, all bool) (string, error) {
 	if is, _ := IsGit(); !is {
 		got.logger.Fatalf("Not a valid git directory\n")
 	}

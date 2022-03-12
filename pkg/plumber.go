@@ -135,7 +135,8 @@ func (got *Got) CatFile(prefix string, mode int) error{
 
 //LsFiles prints to stdOut the state of staged files, i.e. the index files
 //After a Commit, it is clean
-func (got *Got) LsFiles(stage bool) {
+// comeback
+func (got *Got) LsFiles(stage, lcached, ldeleted, lmodified, lothers bool ) {
 
 	indexes, err := readIndexFile(got)
 	if err != nil {

@@ -21,8 +21,13 @@ func (a app) run() {
 
 }
 
+//command list
+// add 	branch cat 	commit 	config 	diff 	fetch 	hash 	init 	ls-files 	ls-tree 	merge
+// pull 	push 	read-tree 	remote 	rm 	status 	switch 	update-index 	verify-pack 	write-tree
+// 
+
 //comeback handle exit codes
-func (a *app) parseArgs() (runner, error) {	
+func (a *app) parseArgs() (Runner, error) {	
 
 	// add
 	addCmd := flag.NewFlagSet("add", flag.ExitOnError)
@@ -46,15 +51,25 @@ func (a *app) parseArgs() (runner, error) {
 	// it expexts that an `add` has already been run, or a `rm` after an `add`.
 	commitCmd := flag.NewFlagSet("commit", flag.ExitOnError)
 	var cmtMsg string 
+	var all bool
 	commitCmd.StringVar(&cmtMsg, "m", "update", "commit after add or remove" )
+	commitCmd.BoolVar(&all, "a", false, `Tell the command to automatically stage files that have been modified and deleted, 
+		but new files you have not told Git about are not affected.`)
+	commitCmd.BoolVar(&all, "all", false, `Tell the command to automatically stage files that have been modified and deleted, 
+		but new files you have not told Git about are not affected.`)
 
 	// config
 	configCmd := flag.NewFlagSet("config", flag.ExitOnError)
 
 
 	// diff
+	var cached bool
+	var output string
 	diffCmd := flag.NewFlagSet("diff", flag.ExitOnError)
-
+	diffCmd.BoolVar(&cached, "cached", false, `Cached instructs git-diff to check for changes in the working tree
+	 on files that have already  been staged in the index. if its not set, git-diff
+	  checks for changes in  WT that have not been added` )
+	diffCmd.StringVar(&output, "output", "", "Dumps diff in file instead of standard output")
 
 	// fetch
 	fetchCmd := flag.NewFlagSet("fetch", flag.ExitOnError)
@@ -68,6 +83,11 @@ func (a *app) parseArgs() (runner, error) {
 	
 	// ls-files
 	lsFilesCmd := flag.NewFlagSet("ls-files", flag.ExitOnError)
+	var lcached, ldeleted, lmodified, lothers bool
+	lsFilesCmd.BoolVar(&lcached, "c", true, "Show cached files in the output, default")
+	lsFilesCmd.BoolVar(&ldeleted, "d", false, "Show deleted files in the output ")
+	lsFilesCmd.BoolVar(&lmodified, "m", false, "Show modified files in the output ")
+	lsFilesCmd.BoolVar(&lothers, "o", false, "Show untracked files in the output ")
 
 	//ls-tree 
 	lsTreeCmd := flag.NewFlagSet("ls-tree", flag.ExitOnError)
@@ -184,59 +204,82 @@ func (a *app) parseArgs() (runner, error) {
 
 	switch  {
 		//comeback
-	case addCmd.Parsed(): {
-		return &add{
-			addFlag, args,
-		}, nil
-
-	} 
-
-	case branchCmd.Parsed(): {
-		name := branchCmd.Arg(0)
-		
-		b := branch {
-			name: name,
-
-		}
-	} 
-
-	case rmvCmd.Parsed(): {
-		if len(args) > 0 {
-			return &rm {
-				args,
+		case addCmd.Parsed(): {
+			return &add{
+				addFlag, args,
 			}, nil
-		} else {
-			return nil, pkg.ArgsIncomplete()
+
+		} 
+
+		
+
+		case branchCmd.Parsed(): {
+			name := branchCmd.Arg(0)
+			
+			b := branch {
+				name: name,
+
+			}
+		} 
+
+		case commitCmd.Parsed(): {
+
 		}
-	}
-	case commitCmd.Parsed(): {
-		if len(args) != 0 {
-			return nil, pkg.ArgsIncomplete()
-		}
-		return &commit{
-			msg: cmtMsg,
-		}, nil
-	} 
-	case catCmd.Parsed(): {
-		if len(args) == 1 {
-			if (_type && !size && !pretty) {
-				return &cat{args[0], 0}, nil
-			} else if (!_type && size && !pretty) {
-				return &cat{args[0], 1}, nil
-			} else if (!_type && !size && pretty) {
-				return &cat{args[0], 2}, nil
+
+		case diffCmd.Parsed(): {
+			if len(args) > 1 {
+				return nil, fmt.Errorf("Dif parse Error: We currently support only one arg for diffs")
+			}
+
+			if cached && args[0] != "" {
+				return nil, fmt.Errorf("We do not support ")
+			}	
+
+			return &diff{
+				cached: cached,
+				output: output,
+				arg: args[0],
+			}, nil
+		} 
+
+		case rmvCmd.Parsed(): {
+			if len(args) > 0 {
+				return &rm {
+					args,
+				}, nil
 			} else {
-				return nil, fmt.Errorf("Only one of the three flags must be set\n")
+				return nil, pkg.ArgsIncomplete()
 			}
 		}
-		return nil, fmt.Errorf("Only one argument is needed by command")
-	}
+		case commitCmd.Parsed(): {
+			if len(args) != 0 {
+				return nil, pkg.ArgsIncomplete()
+			}
+			return &commit{
+				msg: cmtMsg,
+			}, nil
+		} 
+		case catCmd.Parsed(): {
+			if len(args) == 1 {
+				if (_type && !size && !pretty) {
+					return &cat{args[0], 0}, nil
+				} else if (!_type && size && !pretty) {
+					return &cat{args[0], 1}, nil
+				} else if (!_type && !size && pretty) {
+					return &cat{args[0], 2}, nil
+				} else {
+					return nil, fmt.Errorf("Only one of the three flags must be set\n")
+				}
+			}
+			return nil, fmt.Errorf("Only one argument is needed by command")
+		}
 
-	default: { 
-		return nil, fmt.Errorf("Error parrsing flags and args")
-	}
+		default: { 
+			return nil, fmt.Errorf("Error parrsing flags")
+		}
 	} 
 
+	return nil, fmt.Errorf("Error parrsing args")
 }
 
 
