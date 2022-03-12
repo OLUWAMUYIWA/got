@@ -1,24 +1,53 @@
-package cmd
+package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
 	"os"
+	"os/signal"
+
 	"github.com/OLUWAMUYIWA/got/pkg"
 )
 
 type app struct {
-	logger *log.Logger
+	*log.Logger
 }
 
-func (a *app) new() {
-	a.logger = log.New(os.Stdout, "Got Command Error", log.Ldate | log.Ltime)
+func newApp() *app {
+	a := &app{
+	log.New(os.Stdout, "Got Command Error", log.Ldate | log.Ltime),
+}
+	return a
 }
 
 
-func (a app) run() {
+func (a *app) Run() error {
+	//comeback: maybe i want to have a timeout here
+	ctx, cancel := context.WithCancel(context.Background())
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, os.Kill)
 
+	go func() { // cancel when the channel gets notified
+		select {
+		case sig := <- c:
+			a.Printf(fmt.Sprintf("Program stopped due to this signal: %s", sig))
+			cancel()
+		}
+	}()
+
+	runner, err := a.parseArgs(ctx)
+
+	if err != nil {
+		return err
+	}
+
+	if err := runner.Run(ctx); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 //command list
@@ -26,14 +55,14 @@ func (a app) run() {
 // pull 	push 	read-tree 	remote 	rm 	status 	switch 	update-index 	verify-pack 	write-tree
 // 
 
-//comeback handle exit codes
-func (a *app) parseArgs() (Runner, error) {	
+//comeback handle exit codes and context
+func (a *app) parseArgs(ctx context.Context) (Runner, error) {	
 
 	// add
 	addCmd := flag.NewFlagSet("add", flag.ExitOnError)
-	var addFlag bool
-	addCmd.BoolVar(&addFlag, "all", false, "Specify that all files starting from root directory should de added")
-	addCmd.BoolVar(&addFlag, "A", false, "Specify that all files starting from root directory should de added (shorthand)")
+	var aall bool
+	addCmd.BoolVar(&aall, "all", false, "Specify that all files starting from root directory should de added")
+	addCmd.BoolVar(&aall, "A", false, "Specify that all files starting from root directory should de added (shorthand)")
 
 
 	branchCmd := flag.NewFlagSet("branch", flag.ExitOnError)
@@ -51,11 +80,11 @@ func (a *app) parseArgs() (Runner, error) {
 	// it expexts that an `add` has already been run, or a `rm` after an `add`.
 	commitCmd := flag.NewFlagSet("commit", flag.ExitOnError)
 	var cmtMsg string 
-	var all bool
+	var c_all bool
 	commitCmd.StringVar(&cmtMsg, "m", "update", "commit after add or remove" )
-	commitCmd.BoolVar(&all, "a", false, `Tell the command to automatically stage files that have been modified and deleted, 
+	commitCmd.BoolVar(&c_all, "a", false, `Tell the command to automatically stage files that have been modified and deleted, 
 		but new files you have not told Git about are not affected.`)
-	commitCmd.BoolVar(&all, "all", false, `Tell the command to automatically stage files that have been modified and deleted, 
+	commitCmd.BoolVar(&c_all, "all", false, `Tell the command to automatically stage files that have been modified and deleted, 
 		but new files you have not told Git about are not affected.`)
 
 	// config
@@ -83,8 +112,9 @@ func (a *app) parseArgs() (Runner, error) {
 	
 	// ls-files
 	lsFilesCmd := flag.NewFlagSet("ls-files", flag.ExitOnError)
-	var lcached, ldeleted, lmodified, lothers bool
-	lsFilesCmd.BoolVar(&lcached, "c", true, "Show cached files in the output, default")
+	var lstaged, lcached, ldeleted, lmodified, lothers bool
+	lsFilesCmd.BoolVar(&lstaged, "s", false, "Show staged contents' mode bits, object name and stage number in the output.")
+	lsFilesCmd.BoolVar(&lcached, "c", true, "Show cached files in the output, default") //comeback
 	lsFilesCmd.BoolVar(&ldeleted, "d", false, "Show deleted files in the output ")
 	lsFilesCmd.BoolVar(&lmodified, "m", false, "Show modified files in the output ")
 	lsFilesCmd.BoolVar(&lothers, "o", false, "Show untracked files in the output ")
@@ -105,9 +135,17 @@ func (a *app) parseArgs() (Runner, error) {
 
 	// remote
 	rmtCmd := flag.NewFlagSet("remote", flag.ExitOnError)
+
 	
 	// rm
 	rmvCmd := flag.NewFlagSet("rm", flag.ExitOnError)
+	// comeback trick. just trying something 
+	rmvCmd.Usage = func() {
+		os.Stdout.Write([]byte("Error parsing the rm command"))
+	}
+	var rcached bool
+	rmvCmd.BoolVar(&rcached, "c", false, `Use this option to unstage and remove paths only from the index. 
+		Working tree files, whether modified or not, will be left alone.`[1:])
 
 	// status
 	statusCmd := flag.NewFlagSet("status", flag.ExitOnError)
@@ -206,7 +244,7 @@ func (a *app) parseArgs() (Runner, error) {
 		//comeback
 		case addCmd.Parsed(): {
 			return &add{
-				addFlag, args,
+				aall, args,
 			}, nil
 
 		} 
@@ -245,6 +283,7 @@ func (a *app) parseArgs() (Runner, error) {
 		case rmvCmd.Parsed(): {
 			if len(args) > 0 {
 				return &rm {
+					rcached,
 					args,
 				}, nil
 			} else {

@@ -14,6 +14,10 @@ import (
 	"golang.org/x/sys/unix"
 )
 
+
+// Index holds a snapshot of the content of the working tree, 
+// and it is this snapshot that is taken as the contents of the next commit.
+
 //The index stores all the info about files needed to write a tree object
 //we want to ensure that the index is a multiple of 8 bytes, so we might pad with null bytes if need be
 type Index struct {

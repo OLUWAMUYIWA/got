@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"log"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -95,26 +96,30 @@ func (got *Got) Status() {
 //provide full paths please
 //comebck: move parsing problems to cmd
 func (got *Got) Add(all bool, args ...string) error {
-	switch len(args) {
-	case 0: {
-		if all { //if flag specifies all
-			return got.addAll()
+	if all {
+		return got.addAll()
+	}
+
+	if len(args) == 1 {
+		// trick: fs.Glob is the real king here. An interesting api that made the job easy
+		pathList, err := fs.Glob(os.DirFS(got.baseDir), args[0])
+		if err != nil {
+			return fmt.Errorf("Error while getting filenames from pathspec: %w", err)
+		}		
+		return got.addPaths(pathList)
+	} else {
+		pathList := []string{}
+		for _,v := range args {
+			l, err := fs.Glob(os.DirFS(got.baseDir), v)
+			if err != nil {
+				return fmt.Errorf("Error while getting filenames from pathspec: %w", err)
+			}	
+			pathList = append(pathList, l...)
+
 		}
-		//else
-		return ArgsIncomplete()
-		
+		return got.addPaths(pathList)
 	}
-	case 1: {
-		if args[1] == "." {
-			return got.addAll()
-		} else {
-			return got.addPaths(args[1:])
-		}
-	}
-	default: {
-		return got.addPaths(args[1:])
-	}
-	}
+	
 }
 
 //comeback. is the Walkdir correct?
@@ -180,8 +185,24 @@ func (got *Got) addPaths(paths []string) error {
 //comeback
 
 // Rm remove files matching pathspec from the index, or from the working tree and the index
+// It  will not remove a file from just your working directory
 //provide full paths please
-func (g *Got) Rm(paths ...string) error {
+func (g *Got) Rm(cached bool, args []string) error {
+	var paths []string
+	for _,p := range args {
+		pList, err := fs.Glob(os.DirFS(g.WkDir()),p)
+		if err != nil {
+			return fmt.Errorf("Error while getting filenames from pathspec: %w", err)
+
+		}
+		paths = append(paths, pList...)
+	}
+
+	return g.rmPaths(cached, paths...)
+}
+
+// comeback
+func (g *Got) rmPaths(cached bool, paths ...string) error {
 	return nil
 }
 

@@ -1,10 +1,13 @@
-package cmd
+package main
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/OLUWAMUYIWA/got/pkg"
 )
+
+//comeback: handle context propagation in all runners
 
 // Runner handles the commands after they have been parsed
 // the point of it is to allow a cleaner inerface for all git commands to implement
@@ -12,14 +15,14 @@ import (
 // of each `Runner`, we can abstract the calls to `cmd` `api`s, do  dome pre-processing and post-processing
 // without littering the `parseArgs` method any further
 type Runner interface {
-	Run() error
+	Run(ctx context.Context) error
 }
 
 type initializer struct{
 	wkdir string
 }
 
-func (i *initializer) Run() error {
+func (i *initializer) Run(ctx context.Context) error {
 	return  pkg.Init((*i).wkdir)
 }
 
@@ -29,7 +32,7 @@ type add struct {
 	args []string
 }
 
-func (a *add) Run() error {
+func (a *add) Run(ctx context.Context) error {
 	got := pkg.NewGot()
 	if a.addFlag && len(a.args) != 0 {
 		return fmt.Errorf("Error: 'A' flag is set but arguments were provided")
@@ -43,7 +46,7 @@ type branch struct {
 	delete bool
 }
 
-func (b *branch) Run() error {
+func (b *branch) Run(ctx context.Context) error {
 	return nil
 }
 
@@ -53,7 +56,7 @@ type cat struct {
 	mode int
 }
 
-func(c *cat) Run() error {
+func(c *cat) Run(ctx context.Context) error {
 	got := pkg.NewGot()
 	return got.CatFile((*c).prefix, (*c).mode)
 }
@@ -65,7 +68,7 @@ type commit struct {
 	msg string
 } 
 
-func (c *commit) Run() error {
+func (c *commit) Run(ctx context.Context) error {
 	got := pkg.NewGot()
 	if c.msg == "" {
 		return fmt.Errorf("message should not be empty") 
@@ -91,7 +94,7 @@ type diff struct {
 	output, arg string
 }
 
-func (d *diff) Run() error {
+func (d *diff) Run(ctx context.Context) error {
 	got := pkg.NewGot()
 
 	err := got.Diff(d.cached, d.output, d.arg)
@@ -100,12 +103,13 @@ func (d *diff) Run() error {
 }
 
 type rm struct {
+	cached bool
 	paths []string
 }
 
-func (a *rm) Run() error {
+func (a *rm) Run(ctx context.Context) error {
 	got := pkg.NewGot()
-	if err := got.Rm(a.paths...); err != nil {
+	if err := got.Rm(a.cached, a.paths); err != nil {
 			return err
 	}
 	return nil
@@ -113,13 +117,13 @@ func (a *rm) Run() error {
 
 
 type lsFiles struct {
-	lcached, ldeleted, lmodified, lothers bool
+	lstaged, lcached, ldeleted, lmodified, lothers bool
 }
 
-func (l *lsFiles) Run() error {
+func (l *lsFiles) Run(ctx context.Context) error {
 	got := pkg.NewGot()
-
-	got.LsFiles()
+	err := got.LsFiles(l.lstaged, l.lcached, l.ldeleted, l.lmodified, l.lothers)
+	return err
 }
 
 type _switch struct {
@@ -127,7 +131,7 @@ type _switch struct {
 	new bool
 }
 
-func (s *_switch) Run() error {
+func (s *_switch) Run(ctx context.Context) error {
 	return nil
 }
 

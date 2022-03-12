@@ -136,16 +136,18 @@ func (got *Got) CatFile(prefix string, mode int) error{
 //LsFiles prints to stdOut the state of staged files, i.e. the index files
 //After a Commit, it is clean
 // comeback
-func (got *Got) LsFiles(stage, lcached, ldeleted, lmodified, lothers bool ) {
+func (got *Got) LsFiles(stage, cached, deleted, modified, others bool ) error {
 
 	indexes, err := readIndexFile(got)
 	if err != nil {
-		got.FatalErr(err)
+		return err
 	}
+
 	if len(indexes) != 0 {
 		got.logger.Printf("No staged files\n")
-		return
+		return fmt.Errorf("No files staged")
 	}
+
 	for _, ind := range indexes {
 		path := string(ind.path)
 		if stage {
@@ -163,6 +165,8 @@ func (got *Got) LsFiles(stage, lcached, ldeleted, lmodified, lothers bool ) {
 			got.logger.Printf("%s\n", path)
 		}
 	}
+
+	return nil
 }
 
 //we want to know the file that were changes, the ones that were deleted, and the ones that were added
