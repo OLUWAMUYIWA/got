@@ -1,4 +1,4 @@
-package main
+package cmd
 
 import (
 	"context"
@@ -50,15 +50,61 @@ func (b *branch) Run(ctx context.Context) error {
 	return nil
 }
 
+type catType int
 
+const (
+	s catType = iota
+	t
+	p 
+
+)
+// Provide content or type and size information for repository objects
 type cat struct {
 	prefix string
-	mode int
+	size, _type, pretty bool
+	mode catType
 }
 
+func (c *cat) valid() bool {
+	if !c.size && !c._type && !c.pretty {
+		c.pretty = true
+		return true
+	}
+
+	if c.size && !c._type && !c.pretty {
+		return true
+	}
+
+	if !c.size && c._type && !c.pretty {
+		return true
+	}
+
+	if !c.size && !c._type && c.pretty {
+		return true
+	}
+
+	return false
+
+}
 func(c *cat) Run(ctx context.Context) error {
+	if !c.valid() {
+		return fmt.Errorf("Problem validating arguments, more than one of -t, -s, -p is set, or none is")
+	}
 	got := pkg.NewGot()
-	return got.CatFile((*c).prefix, (*c).mode)
+	if c.size  {
+		c.mode = s
+	} else if c._type  {
+		c.mode = t
+	} else {
+		c.mode = p
+	}
+
+	rdr, err := got.CatFile((*c).prefix, int((*c).mode))
+	if err == nil {
+		err := got.Log(rdr)
+		return err
+	}
+	return err
 }
 
 

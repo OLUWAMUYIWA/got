@@ -1,4 +1,4 @@
-package main
+package cmd
 
 import (
 	"context"
@@ -15,10 +15,10 @@ type app struct {
 	*log.Logger
 }
 
-func newApp() *app {
+func NewApp() *app {
 	a := &app{
-	log.New(os.Stdout, "Got Command Error", log.Ldate | log.Ltime),
-}
+		log.New(os.Stdout, "Got Command Error", log.Ldate | log.Ltime),
+	}
 	return a
 }
 
@@ -58,6 +58,7 @@ func (a *app) Run() error {
 //comeback handle exit codes and context
 func (a *app) parseArgs(ctx context.Context) (Runner, error) {	
 
+	
 	// add
 	addCmd := flag.NewFlagSet("add", flag.ExitOnError)
 	var aall bool
@@ -69,9 +70,9 @@ func (a *app) parseArgs(ctx context.Context) (Runner, error) {
 
 	//cat
 	catCmd := flag.NewFlagSet("cat-file", flag.ExitOnError)
-	var _type, size, pretty bool
-	catCmd.BoolVar(&_type, "t", false, "specify that we only need the type" )
+	var size, _type, pretty bool
 	catCmd.BoolVar(&size, "s", false, "specify that we only need the size" )
+	catCmd.BoolVar(&_type, "t", false, "specify that we only need the type" )
 	catCmd.BoolVar(&pretty, "p", false, "specify that we nned pretty printing" )
 
 
@@ -260,6 +261,11 @@ func (a *app) parseArgs(ctx context.Context) (Runner, error) {
 			}
 		} 
 
+		case catCmd.Parsed(): {
+			cat := &cat{}
+			
+		}
+
 		case commitCmd.Parsed(): {
 
 		}
@@ -321,7 +327,3 @@ func (a *app) parseArgs(ctx context.Context) (Runner, error) {
 	return nil, fmt.Errorf("Error parrsing args")
 }
 
-
-func Exec() int {
-	return 0
-}

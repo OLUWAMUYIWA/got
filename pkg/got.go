@@ -2,6 +2,7 @@ package pkg
 
 import (
 	"errors"
+	"io"
 	"io/fs"
 	"log"
 	"os"
@@ -48,6 +49,11 @@ func NewGot() *Got {
 	logger := log.New(os.Stdout, "GOT library: ", log.Ldate | log.Ltime)
 	logger.Println("Got Library: ")
 	return &Got{baseDir: baseDir, logger: logger, head: head}
+}
+
+func (g *Got) Log(rdr io.Reader) error {
+	_, err := io.Copy(g.logger.Writer(), rdr)
+	return err
 }
 
 //All Git objects are stored the same way, just with different types – instead of the string blob, the

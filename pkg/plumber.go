@@ -1,6 +1,7 @@
 package pkg
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/binary"
 	"encoding/hex"
@@ -103,34 +104,46 @@ func (got *Got) ReadObject(prefix string) (string, string, []byte, error) {
 }
 
 //CatFile displays the file info using the git logger (set as os.Stdout). It uses flags to determine what it displays
-func (got *Got) CatFile(prefix string, mode int) error{
+func (got *Got) CatFile(prefix string, mode int) (io.Reader, error){
 	
 	f_name, dType, data, err := got.ReadObject(prefix)
 	//this error should just cause the program to exit.
 	if err != nil {
-		return err
+		return nil, err
 	}
+	var b bytes.Buffer
 	switch mode {
-	case 0:
-		got.logger.Printf("File %s: Size: %d\n", f_name, len(data))
-	case 1:
-		got.logger.Printf("File %s Type: %s\n", f_name, dType)
-	case 2:
+	case 0: //size
+		_, err := io.WriteString(&b, fmt.Sprintf("File %s: Size: %d\n", f_name, len(data)))
+		return &b, err
+	case 1: //type
+		_, err := io.WriteString(&b, fmt.Sprintf("File %s Type: %s\n", f_name, dType))
+		return &b, err
+	case 2: //pretty
 		if dType == "commit" || dType == "blob" {
-			got.logger.Printf("Content %s: \n%s", f_name, string(data))
+			_, err := io.WriteString(&b, fmt.Sprintf("Content %s: \n%s", f_name, string(data)))
+			return &b, err
 		} else if dType == "tree" {
 			//is a directory. ewe need to read th tree before printing
-			got.logger.Printf("Directory: \n")
+			_, err := io.WriteString(&b, fmt.Sprintf("Directory: \n"))
+			if err != nil {
+				return nil, err
+			}
 			objs := got.deserTree(prefix)
 			for _, obj := range objs {
-				got.CatFile(obj.sha1, 2)
+				rdr, err := got.CatFile(obj.sha1, 2)
+				if err != nil {
+					return nil, err
+				}
+				io.Copy(&b, rdr)
 			}
+			return &b, nil
 		}
 	default:
-		got.logger.Fatalf("Bad flag mode. Check again, must be either size, type, pretty \n")
+		_, err := io.WriteString(&b, fmt.Sprintf("Bad flag mode. Check again, must be either size, type, pretty \n"))
+		return &b, err
 	}
 
-	return nil
 }
 
 //LsFiles prints to stdOut the state of staged files, i.e. the index files
