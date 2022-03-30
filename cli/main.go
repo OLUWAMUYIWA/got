@@ -4,6 +4,7 @@ import (
 	"os"
 	"github.com/OLUWAMUYIWA/got/cli/cmd"
 )
+
 // isnt this main function neat?
 func main() {
 	app := cmd.NewApp()

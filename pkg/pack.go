@@ -26,7 +26,7 @@ func (got *Got) createPack(objs []string) []byte {
 		b = append(b, got.encodePackObjects(obj)...)
 	}
 	sha1 := justhash(b)
-	b = append(b, sha1...)
+	b = append(b, sha1[:]...)
 	return b
 
 }

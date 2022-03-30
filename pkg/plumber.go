@@ -1,7 +1,6 @@
 package pkg
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/binary"
 	"encoding/hex"
@@ -28,7 +27,7 @@ import (
 //it is unlikely to find two blobs with the same sha1 prefix, but if such happens, we return
 //an error and expect the user to provide a longer string
 func (got *Got) FindObject(prefix string) (string, error) {
-	
+
 	//first check for length
 	switch l := len(prefix); {
 	case l <= 2:
@@ -104,8 +103,8 @@ func (got *Got) ReadObject(prefix string) (string, string, []byte, error) {
 }
 
 //CatFile displays the file info using the git logger (set as os.Stdout). It uses flags to determine what it displays
-func (got *Got) CatFile(prefix string, mode int) (io.Reader, error){
-	
+func (got *Got) CatFile(prefix string, mode int) (io.Reader, error) {
+
 	f_name, dType, data, err := got.ReadObject(prefix)
 	//this error should just cause the program to exit.
 	if err != nil {
@@ -144,12 +143,13 @@ func (got *Got) CatFile(prefix string, mode int) (io.Reader, error){
 		return &b, err
 	}
 
+	return nil, nil
 }
 
 //LsFiles prints to stdOut the state of staged files, i.e. the index files
 //After a Commit, it is clean
 // comeback
-func (got *Got) LsFiles(stage, cached, deleted, modified, others bool ) error {
+func (got *Got) LsFiles(stage, cached, deleted, modified, others bool) error {
 
 	indexes, err := readIndexFile(got)
 	if err != nil {
@@ -232,7 +232,7 @@ func (got *Got) get_status() ([]string, []string, map[string]string) {
 				if err != nil {
 					return
 				}
-				if hex.EncodeToString(raw) != hex.EncodeToString(ind.sha1_obj_id[:]) {
+				if hex.EncodeToString(raw[:]) != hex.EncodeToString(ind.sha1_obj_id[:]) {
 					mod[string(ind.path)] = f_path
 				}
 			}

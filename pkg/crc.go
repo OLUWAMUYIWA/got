@@ -1,4 +1,4 @@
-package proto
+package pkg
 
 //TODO: check Henry Warren's Hackers Delight
 

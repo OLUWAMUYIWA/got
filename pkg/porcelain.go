@@ -6,7 +6,6 @@ import (
 	"io/fs"
 	"log"
 	"os"
-	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -35,10 +34,9 @@ func Init(name string) error {
 		}
 		n = filepath.Join(name, ".git")
 	}
-	
-	
+
 	//MkdirAll is just perfect because it creates directories on all the paths
-	
+
 	if err := os.MkdirAll(n, 0777); err != nil {
 		return err
 	}
@@ -61,12 +59,10 @@ func Init(name string) error {
 	return nil
 }
 
-
 //comeback
 func (g *Got) Diff(cached bool, output, arg string) error {
 	return nil
 }
-
 
 func (got *Got) Status() {
 	if is, _ := IsGit(); !is {
@@ -91,7 +87,6 @@ func (got *Got) Status() {
 	}
 }
 
-
 // Add updates the index using the current content found in the working tree, to prepare the content staged for the next commit.
 //provide full paths please
 //comebck: move parsing problems to cmd
@@ -105,37 +100,37 @@ func (got *Got) Add(all bool, args ...string) error {
 		pathList, err := fs.Glob(os.DirFS(got.baseDir), args[0])
 		if err != nil {
 			return fmt.Errorf("Error while getting filenames from pathspec: %w", err)
-		}		
+		}
 		return got.addPaths(pathList)
 	} else {
 		pathList := []string{}
-		for _,v := range args {
+		for _, v := range args {
 			l, err := fs.Glob(os.DirFS(got.baseDir), v)
 			if err != nil {
 				return fmt.Errorf("Error while getting filenames from pathspec: %w", err)
-			}	
+			}
 			pathList = append(pathList, l...)
 
 		}
 		return got.addPaths(pathList)
 	}
-	
+
 }
 
 //comeback. is the Walkdir correct?
 func (got *Got) addAll() error {
 	paths := []string{}
 	fs.WalkDir(os.DirFS(got.baseDir), ".", func(path string, d fs.DirEntry, err error) error {
-		
+
 		if err != nil {
 			if !d.IsDir() {
-				paths = append(paths, filepath.Join(got.baseDir + path))
+				paths = append(paths, filepath.Join(got.baseDir+path))
 			}
 			return nil
 		} else {
 			return fs.SkipDir
 		}
-		
+
 	})
 	return got.addPaths(paths)
 }
@@ -189,8 +184,8 @@ func (got *Got) addPaths(paths []string) error {
 //provide full paths please
 func (g *Got) Rm(cached bool, args []string) error {
 	var paths []string
-	for _,p := range args {
-		pList, err := fs.Glob(os.DirFS(g.WkDir()),p)
+	for _, p := range args {
+		pList, err := fs.Glob(os.DirFS(g.WkDir()), p)
 		if err != nil {
 			return fmt.Errorf("Error while getting filenames from pathspec: %w", err)
 
@@ -205,7 +200,6 @@ func (g *Got) Rm(cached bool, args []string) error {
 func (g *Got) rmPaths(cached bool, paths ...string) error {
 	return nil
 }
-
 
 //https://github.com/git/git/blob/master/Documentation/technical/http-protocol.txt
 //https://github.com/git/git/blob/master/Documentation/technical/pack-protocol.txt

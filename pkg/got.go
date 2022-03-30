@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 )
 
+
 type Got struct {
 	baseDir string
 	head    *Ref
@@ -91,9 +92,4 @@ func IsGit() (bool, error) {
 		err = nil
 	}
 	return is, err
-}
-
-//todo
-func Wkdir() string {
-	return ""
 }

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"compress/zlib"
 	"crypto/sha1"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,6 +13,18 @@ import (
 	"path/filepath"
 	"strings"
 )
+
+
+
+func bytesToSha(hex []byte) [20]byte {
+	if len(hex) != 20 {
+		//don't even try to use this method if the length of the slic is not exactly 20. Thank you!
+		panic(fmt.Errorf("length not equal to 20"))
+	}
+	var b [20]byte
+	copy(b[:], hex)
+	return b
+}
 
 //getConfig gets into got's config and gets the username and email
 //I chose to use json because reading and writing it is clean and easy. No stress
@@ -41,9 +54,8 @@ func writeToFile(path string, b []byte) error {
 	defer f.Close()
 	return err
 
-	bufWriter := bufio.NewWriter(f)
-	_, err = bufWriter.Write(b)
-	return err
+	bf := bufio.NewWriter(f)
+	_, err = bf.Write(b)
 	return err
 }
 
@@ -76,8 +88,10 @@ func decompress(rdr io.Reader, dst io.Writer) error {
 	return nil
 }
 
+type Sha1 = [20]byte
+
 //justhash is the hash function used by hashobj
-func justhash(data []byte) []byte {
+func justhash(data []byte) Sha1 {
 	//create a  new hasher
 	hahser := sha1.New()
 	//write the bytes to the hasher
@@ -88,10 +102,12 @@ func justhash(data []byte) []byte {
 	}
 	//to get the hash, we only need to sum a nill byte, which appends a write of its argument(byte slice) to the currently written hash
 	//and returns the result
-	return hahser.Sum(nil)
+	var h Sha1
+	copy(h[:], hahser.Sum(nil))
+	return h
 }
 
-func hashWithObjFormat(data []byte, ty string) ([]byte, error) {
+func hashWithObjFormat(data []byte, ty string) (Sha1, error) {
 	var s strings.Builder
 	hdr := fmt.Sprintf("%s %d", ty, len(data))
 	//i see no reason to handle errors here since no I/O is happening
@@ -102,6 +118,13 @@ func hashWithObjFormat(data []byte, ty string) ([]byte, error) {
 	b := []byte(s.String())
 	raw := justhash(b)
 	return raw, nil
+}
+
+func strToHash(str string) Sha1 {
+	h, _ := hex.DecodeString(str)
+	var hash Sha1
+	copy(hash[:], h)
+	return hash
 }
 
 //TODO: not needed
@@ -134,10 +157,3 @@ func uvarint(r io.Reader) (uint64, error) {
 		d += 7
 	}
 }
-
-// //had to repeat this here to avoid cyclic dependencies
-// //checks if the kth bit is set. contract: n <= 255. indexed beginning from zero
-// func isKthSet(i uint8, k int) bool {
-// 	mask := uint8(1) << k
-// 	return (i & mask) != 0
-// }

@@ -8,20 +8,14 @@ import (
 	"io"
 )
 
-//!!!!BLOB OBJECT AND ITS GOTOBJECT IMPLEMENTATION!!!!!
-type blobRaw struct {
-	sha  string
-	data []byte
-}
-
 type Blob struct {
-	sha [20]byte
+	sha  Sha1
 	size int
 	//uncompressed data
 	data []byte
 }
 
-func (blob *Blob) Hash(wkdir string) ([]byte, error) {
+func (blob *Blob) Hash(wkdir string) (Sha1, error) {
 	return HashObj(blob.Type(), blob.data, wkdir)
 }
 
@@ -34,9 +28,9 @@ func parseBlob(rdr io.Reader, got *Got) (*Blob, error) {
 	var d bytes.Buffer
 	blob := &Blob{}
 	if ty, err := b.ReadBytes(' '); err != nil {
-		if bytes.Compare(ty, []byte("blob")) != 0  {
+		if bytes.Compare(ty, []byte("blob")) != 0 {
 			return nil, fmt.Errorf("Expected blob, found: %s", ty)
-		} 
+		}
 		if len, err := b.ReadBytes(Sep); err != nil {
 			blob.size = int(binary.BigEndian.Uint32(len)) //comeback
 			if _, err := io.CopyN(&d, b, int64(blob.size)); err != nil {
@@ -45,7 +39,5 @@ func parseBlob(rdr io.Reader, got *Got) (*Blob, error) {
 			}
 		}
 	}
-	return  nil, fmt.Errorf("Error reading blob")
+	return nil, fmt.Errorf("Error reading blob")
 }
-
-

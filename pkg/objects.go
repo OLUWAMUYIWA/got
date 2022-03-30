@@ -23,7 +23,7 @@ const (
 
 type ObjectErr struct {
 	ErrSTring string
-	inner error
+	inner     error
 }
 
 func (e *ObjectErr) Error() string {
@@ -47,17 +47,16 @@ type GotObject interface {
 	Type() string
 }
 
-
 //an object could be a commit, tree, blob, or tag
 func parseObject(sha string, got *Got) (*GotObject, error) {
 	// first we check the packfiles to see if the object is among the parsed
 
 	//then we check the git object directory
+	return nil, nil
 }
 
-
 //general hashfunction
-func HashObj(ty string, data []byte, base string) ([]byte, error) {
+func HashObj(ty string, data []byte, base string) (Sha1, error) {
 	//use a string builder because it minimized memory allocation, which is expensive
 	//each write appends to the builder
 	//IGNORING errors here, too many writes, error handling will bloat the code.
@@ -69,32 +68,34 @@ func HashObj(ty string, data []byte, base string) ([]byte, error) {
 	s.WriteByte(Sep)
 	s.Write(data)
 	b := []byte(s.String())
-	raw := justhash(b)
+	var h Sha1
+	h = justhash(b)
+
 	//the byte result must be converted to hex string as that is how it is useful to us
 	//we could either use fmt or hex.EncodeString here. Both works fine
 	//TODO: explain how hex.Decode() does its job. Cool stuff. Also explain how EncodeToString() does it.
 
-	hash_str := hex.EncodeToString(raw)
+	hash_str := hex.EncodeToString(h[:])
 	//first two characters (1 byte) are the name of the directory. The remaining 38 (19 bytes) are the  name of the file
 	//that contains the compressed version of the blob.
 	//remember that sha1 produces a 20-byte hash (160 bits, or 40 hex characters)
 	path := filepath.Join(string(base), ".git/objects/", hash_str[:2])
 	err := os.MkdirAll(path, 0777)
 	if err != nil {
-		return nil, &ObjectErr{}
+		return h, &ObjectErr{}
 	}
 	fPath := filepath.Join(path, hash_str[2:])
 	f, err := os.Create(fPath)
 	if err != nil {
-		return nil, &ObjectErr{}
+		return h, &ObjectErr{}
 	}
 	defer f.Close()
 	//the actual file is then compressed and stored in the file created
 	err = compress(f, b)
 	if err != nil {
-		return nil, &ObjectErr{}
+		return h, &ObjectErr{}
 	}
-	return raw, nil
+	return h, nil
 }
 
 ///READING and WRITING Objects
@@ -125,38 +126,44 @@ func (g *Got) OpenWrite() error {
 	return fmt.Errorf("")
 }
 
-func (got *Got) Object(sha string, ty ObjectType) (GotObject, error){
+func (got *Got) Object(sha string, ty ObjectType) (GotObject, error) {
 	// try pack
 
 	//try object directory
 	// b, err := fs.ReadFile(os.DirFS(filepath.Join(got.WkDir(), ".git", sha[0:2])), shap[2:])
-	f, err := os.Open(filepath.Join(got.WkDir(), ".git", sha[0:2], sha[2:]))
+	base := filepath.Join(got.WkDir(), ".git")
+	f, err := os.Open(filepath.Join(base, sha[0:2], sha[2:]))
 
 	if err != nil {
 		return nil, err
-	} 
+	}
 	objRdr, err := zlib.NewReader(f)
 	if err != nil {
 		return nil, err
 	}
 	switch ty {
-		case blob: {
+	case blob:
+		{
 			return parseBlob(objRdr, got)
 		}
 
-		case tree: {
-			return parseTree(objRdr, got)
+	case tree:
+		{
+			return parseTree(sha, base, objRdr, got)
 		}
-		
-		case commit: {
-			return parseCommit(objRdr, got)
-		}	
 
-		case tag: {
+	case commit:
+		{
+			return parseCommit(objRdr, got)
+		}
+
+	case tag:
+		{
 			parseTag(objRdr, got)
 		}
 
-		default: {
+	default:
+		{
 			return nil, fmt.Errorf("invalid object type")
 		}
 	}
@@ -170,9 +177,6 @@ type gotObject struct {
 	obj GotObject
 }
 
-
 func (o *gotObject) parse() {
-	
+
 }
-
-

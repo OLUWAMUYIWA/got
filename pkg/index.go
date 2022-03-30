@@ -14,8 +14,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-
-// Index holds a snapshot of the content of the working tree, 
+// Index holds a snapshot of the content of the working tree,
 // and it is this snapshot that is taken as the contents of the next commit.
 
 //The index stores all the info about files needed to write a tree object
@@ -37,8 +36,6 @@ type Index struct {
 	path []byte
 }
 
-type Sha1 = [20]byte
-
 func (got *Got) newIndex(path string) *Index {
 	f, err := os.Open(string(path))
 	if err != nil {
@@ -57,7 +54,7 @@ func (got *Got) newIndex(path string) *Index {
 	return i
 }
 
-func mapStatToIndex(stat *unix.Stat_t, sha1 []byte, path string) *Index {
+func mapStatToIndex(stat *unix.Stat_t, sha1 [20]byte, path string) *Index {
 	var i Index
 	i.ctime_s = mapint64ToBytes(stat.Ctim.Sec)
 	i.ctime_ns = mapint64ToBytes(stat.Ctim.Nsec)
@@ -73,7 +70,7 @@ func mapStatToIndex(stat *unix.Stat_t, sha1 []byte, path string) *Index {
 	i.uid = mapint64ToBytes(int64(stat.Uid))
 	i.gid = mapint64ToBytes(int64(stat.Gid))
 	i.f_size = mapint64ToBytes(int64(stat.Size))
-	i.sha1_obj_id = shaToBytes(sha1)
+	i.sha1_obj_id = sha1
 	i.flags = setUpFlags(path)
 	return &i
 }
@@ -106,19 +103,6 @@ func mapint64ToBytes(t int64) [4]byte {
 	arr[2] = byte(t >> (32 - 24))
 	arr[3] = byte(t >> (32 - 32)) //or t & 0xff
 	return arr
-}
-
-//TODO: is there an idiomatic way to do this?
-func shaToBytes(hex []byte) [20]byte {
-	if len(hex) != 20 {
-		//don't even try to use this method id the length of the slic is not exactly 20. Thank you!
-		panic(fmt.Errorf("length not equal to 20"))
-	}
-	var b [20]byte
-	for i := range hex {
-		b[i] = hex[i]
-	}
-	return b
 }
 
 //futzing around, thinking I might have need for doing this.
@@ -271,7 +255,7 @@ func readIndexFile(got *Got) ([]Index, error) {
 	hash := justhash(data[:len(data)-20])
 	//the index file has the lst 160 bits (i.e. 20 bytes) as the sha-1 checksum of all the bits tat come before it
 	//we need to ensure that it matches before considering the data valid
-	if bytes.Compare(hash, data[:(len(data)-20)]) != 0 {
+	if bytes.Compare(hash[:], data[:(len(data)-20)]) != 0 {
 		got.GotErr(errors.New("Checksum is not equal to file digest. File has been tampered with"))
 	}
 	hdr := data[:12]
@@ -315,7 +299,7 @@ func (got *Got) UpdateIndex(entries []*Index) error {
 	}
 	allData := bytes.Join([][]byte{hdr, data}, nil)
 	checksum := justhash(allData)
-	index := bytes.Join([][]byte{allData, checksum}, nil)
+	index := bytes.Join([][]byte{allData, checksum[:]}, nil)
 	err := writeToFile(filepath.Join(".git", "index"), index)
 	if err != nil {
 		return err

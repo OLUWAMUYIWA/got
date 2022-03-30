@@ -29,6 +29,9 @@ var flushPacket = fmt.Sprintf("%.4x", 0)
 //   flush-pkt    = "0000"
 // ----
 
+type Pack struct {
+	Sha string
+}
 type PktLine struct {
 	len     int16
 	id      string
