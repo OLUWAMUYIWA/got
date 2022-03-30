@@ -3,6 +3,7 @@ package pkg
 import (
 	"bufio"
 	"bytes"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -18,8 +19,8 @@ type Tree struct {
 	sha     Sha1
 	entries []item
 	data    []byte
-	cache treeCache
-	len int
+	cache   treeCache
+	len     int
 }
 
 type treeCache struct {
@@ -33,7 +34,6 @@ type item struct {
 	name string
 	sha  Sha1
 }
-
 
 // Tree Structure
 
@@ -55,12 +55,12 @@ func parseTree(sha string, r io.Reader) (*Tree, error) {
 	tree := &Tree{
 		entries: []item{},
 		cache: treeCache{
-			subTrees: map[string]&Tree{},
-			blobs:    map[string]&item{},
+			subTrees: map[string]*Tree{},
+			blobs:    map[string]*item{},
 		},
 	}
 
-	tree.sha = strToHash(sha)
+	tree.sha = strToSha(sha)
 	b := bufio.NewReader(rdr)
 	prefix, err := b.ReadBytes(Sep)
 	if err != nil {
@@ -106,11 +106,10 @@ func parseTree(sha string, r io.Reader) (*Tree, error) {
 		tree.entries = append(tree.entries, tItem)
 	}
 	//comeback to this.
-	tree.data =  db.Bytes()
+	tree.data = db.Bytes()
 
 	return tree, nil
 }
-
 
 //comeback
 func fullyParseTree(sha string, r io.Reader) (*Tree, error) {
@@ -123,7 +122,8 @@ func fullyParseTree(sha string, r io.Reader) (*Tree, error) {
 		if modType(item.mode) == blobfile {
 			t.cache.blobs[item.name] = &item
 		} else {
-			f, err := os.OpenFile(filepath.Join("", sha[:2], sha[2:]), os.O_RDONLY, 0)
+			path := hex.EncodeToString(item.sha[:])
+			f, err := os.OpenFile(filepath.Join("", path[:2], path[2:]), os.O_RDONLY, 0)
 			if err != nil {
 				return nil, err
 			}
@@ -132,8 +132,9 @@ func fullyParseTree(sha string, r io.Reader) (*Tree, error) {
 				return nil, err
 			}
 			t.cache.subTrees[item.name] = currT
+			f.Close()
 		}
-		
+
 	}
 	return t, nil
 }
@@ -157,9 +158,10 @@ func modType(m uint32) fileType {
 	}
 }
 
-func (t *Tree) getItem(path string) (item, error) {
+//comeback
+// func (t *Tree) getItem(path string) (item, error) {
 
-}
+// }
 
 func (t *Tree) Hash(wkdir string) ([]byte, error) {
 	b, err := HashObj(t.Type(), t.data, wkdir)
@@ -188,7 +190,7 @@ func (t *Tree) Encode(wtr io.WriteCloser) error {
 		if _, err := io.WriteString(wtr, fmt.Sprintf("%o %s", e.mode, e.name)); err != nil {
 			return err
 		}
-		b:= []byte{Sep}
+		b := []byte{Sep}
 		b = append(b, e.sha[:]...)
 		if _, err := wtr.Write(b); err != nil {
 			return err

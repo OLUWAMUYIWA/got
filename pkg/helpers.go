@@ -14,7 +14,9 @@ import (
 	"strings"
 )
 
-
+func shaToString(s Sha1) string {
+	return hex.EncodeToString(s[:])
+}
 
 func bytesToSha(hex []byte) [20]byte {
 	if len(hex) != 20 {
@@ -24,6 +26,13 @@ func bytesToSha(hex []byte) [20]byte {
 	var b [20]byte
 	copy(b[:], hex)
 	return b
+}
+
+func strToSha(str string) Sha1 {
+	h, _ := hex.DecodeString(str)
+	var hash Sha1
+	copy(hash[:], h)
+	return hash
 }
 
 //getConfig gets into got's config and gets the username and email
@@ -118,13 +127,6 @@ func hashWithObjFormat(data []byte, ty string) (Sha1, error) {
 	b := []byte(s.String())
 	raw := justhash(b)
 	return raw, nil
-}
-
-func strToHash(str string) Sha1 {
-	h, _ := hex.DecodeString(str)
-	var hash Sha1
-	copy(hash[:], h)
-	return hash
 }
 
 //TODO: not needed

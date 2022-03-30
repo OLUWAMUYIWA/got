@@ -15,15 +15,16 @@ type Blob struct {
 	data []byte
 }
 
-func (blob *Blob) Hash(wkdir string) (Sha1, error) {
-	return HashObj(blob.Type(), blob.data, wkdir)
+func (blob *Blob) Hash(wkdir string) ([]byte, error) {
+	b, err := HashObj(blob.Type(), blob.data, wkdir)
+	return b[:], err
 }
 
 func (c *Blob) Type() string {
 	return "blob"
 }
 
-func parseBlob(rdr io.Reader, got *Got) (*Blob, error) {
+func parseBlob(rdr io.Reader) (*Blob, error) {
 	b := bufio.NewReader(rdr)
 	var d bytes.Buffer
 	blob := &Blob{}

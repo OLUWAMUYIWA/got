@@ -58,6 +58,43 @@ func (got *Got) FindObject(prefix string) (string, error) {
 	}
 }
 
+func (got *Got) ReadObjectStream(prefix string) (string, string, io.Reader, error) {
+	location, err := got.FindObject(prefix)
+	if err != nil {
+		return "", "", nil, err
+	}
+	//get the file name
+	splits := strings.Split(location, "/")
+	f_name := splits[len(splits)-1]
+
+	f, err := os.Open(location)
+	if err != nil {
+		return "", "", nil, err
+	}
+	defer f.Close()
+	//create a buffer to hold the bytes to be read from zlib
+	//buffer implements io.Writer
+	var b bytes.Buffer
+	decompress(f, &b)
+	if err != nil {
+		return "", "", nil, err
+	}
+	//remember that when writing the file, we put in a separator sep to demarcate the header from the body
+	//sep is equal to byte(0)
+	hdr, err := b.ReadBytes(Sep)
+	if err != nil {
+		return "", "", nil, err
+	}
+	//the remainder after reading out the header from the buffer, just like were flushing th buffer
+	//we expect nothing else to be in the buffer right now other than the data itself
+	dType, dLen := "", 0
+	_, err = fmt.Sscanf(string(hdr), "%s %d", &dType, &dLen)
+	if err != nil {
+		return "", "", nil, err
+	}
+	return f_name, dType, &b, nil
+}
+
 //ReadObject bulds on findObject. First, it finds the object,
 //but it does more, it attempts to read it and assert that it contains valid git object files
 //apart from that, it tries to understand what kind of git object it is
@@ -130,7 +167,7 @@ func (got *Got) CatFile(prefix string, mode int) (io.Reader, error) {
 			}
 			objs := got.deserTree(prefix)
 			for _, obj := range objs {
-				rdr, err := got.CatFile(obj.sha1, 2)
+				rdr, err := got.CatFile(shaToString(obj.sha), 2)
 				if err != nil {
 					return nil, err
 				}
@@ -324,7 +361,7 @@ func (got *Got) WriteTree() (string, error) {
 }
 
 //return all the objects (subtrees and blobs) inside a tree
-func (got *Got) deserTree(sha string) []treeItem {
+func (got *Got) deserTree(sha string) []item {
 	if is, _ := IsGit(); !is {
 		got.logger.Fatalf("Not a valid git directory\n")
 	}
@@ -336,8 +373,9 @@ func (got *Got) deserTree(sha string) []treeItem {
 	if len(data) == 0 {
 		got.FatalErr(fmt.Errorf("should be tree object"))
 	}
-	objs := make([]treeItem, 0)
-	var path, sha1 string
+	objs := make([]item, 0)
+	var path string
+	var sha1 Sha1
 	start := 0
 	for {
 		d := data[start:]
@@ -350,9 +388,9 @@ func (got *Got) deserTree(sha string) []treeItem {
 		got.GotErr(err)
 		sep_pos := bytes.IndexByte(split[1], Sep)
 		path = string(split[1][:sep_pos])
-		sha1 = string(split[1][sep_pos+1 : sep_pos+21])
+		sha1 = *(*[20]byte)(split[1][sep_pos+1 : sep_pos+21]) //comeback cool stuff here
 		start += len(split[0]) + 1 + sep_pos + 1 + 20
-		objs = append(objs, treeItem{mode, path, sha1})
+		objs = append(objs, item{uint32(mode), path, sha1})
 	}
 
 	return objs
@@ -364,9 +402,9 @@ func (got *Got) findTreeObjs(sha1 string) []string {
 	var objs []string
 	for _, obj := range got.deserTree(sha1) {
 		if fs.FileMode(obj.mode) == os.ModeDir {
-			objs = append(objs, got.findTreeObjs(obj.sha1)...)
+			objs = append(objs, got.findTreeObjs(shaToString(obj.sha))...)
 		} else {
-			objs = append(objs, obj.sha1)
+			objs = append(objs, shaToString(obj.sha))
 		}
 	}
 

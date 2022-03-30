@@ -144,17 +144,17 @@ func (got *Got) Object(sha string, ty ObjectType) (GotObject, error) {
 	switch ty {
 	case blob:
 		{
-			return parseBlob(objRdr, got)
+			return parseBlob(objRdr)
 		}
 
 	case tree:
 		{
-			return parseTree(sha, base, objRdr, got)
+			return parseTree(sha, objRdr)
 		}
 
 	case commit:
 		{
-			return parseCommit(objRdr, got)
+			return parseCommit(objRdr)
 		}
 
 	case tag:

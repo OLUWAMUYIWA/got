@@ -1,5 +1,6 @@
 package pkg
 
+import "io"
 
 type tagRaw struct {
 	name string
@@ -10,12 +11,9 @@ type Tag struct {
 	id string
 }
 
-
-
 func (t *Tag) Hash(wkdir string) ([]byte, error) {
 	return nil, nil
 }
-
 
 func (t *Tag) Type() string {
 	return "tag"
