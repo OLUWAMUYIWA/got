@@ -14,12 +14,16 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-// Index holds a snapshot of the content of the working tree,
+type Index struct {
+	entries []*IndexEntry
+}
+
+// IndexEntry holds a snapshot of the content of the working tree,
 // and it is this snapshot that is taken as the contents of the next commit.
 
 //The index stores all the info about files needed to write a tree object
 //we want to ensure that the index is a multiple of 8 bytes, so we might pad with null bytes if need be
-type Index struct {
+type IndexEntry struct {
 	ctime_s     [4]byte
 	ctime_ns    [4]byte
 	mtime_s     [4]byte
@@ -36,7 +40,7 @@ type Index struct {
 	path []byte
 }
 
-func (got *Got) newIndex(path string) *Index {
+func (got *Got) newIndexEntry(path string) *IndexEntry {
 	f, err := os.Open(string(path))
 	if err != nil {
 		got.GotErr(err)
@@ -54,8 +58,60 @@ func (got *Got) newIndex(path string) *Index {
 	return i
 }
 
-func mapStatToIndex(stat *unix.Stat_t, sha1 [20]byte, path string) *Index {
-	var i Index
+// read: https://mincong.io/2018/04/28/git-index/
+//The index file contains:
+// 12-byte header.
+// A number of sorted index entries.
+// Extensions. They are identified by signature.
+// 160-bit SHA-1 over the content of the index file before this checksum.
+
+func readIndexFile(got *Got) ([]IndexEntry, error) {
+	if is, _ := IsGit(); !is {
+		got.logger.Fatalf("Not a valid git directory\n")
+	}
+	f, err := os.Open(filepath.Join(".git/index"))
+	p_err, ok := err.(*os.PathError)
+	if ok {
+		temp_err := errors.New("no such file or directory")
+		if p_err.Unwrap() == temp_err {
+			got.logger.Fatalf("You have not indexed any file\n")
+		}
+	} else {
+		got.UpErr(err)
+		return nil, err
+	}
+	data, err := io.ReadAll(f)
+	got.GotErr(err)
+	hash := justhash(data[:len(data)-20])
+	//the index file has the lst 160 bits (i.e. 20 bytes) as the sha-1 checksum of all the bits tat come before it
+	//we need to ensure that it matches before considering the data valid
+	if bytes.Compare(hash[:], data[:(len(data)-20)]) != 0 {
+		got.GotErr(errors.New("Checksum is not equal to file digest. File has been tampered with"))
+	}
+	hdr := data[:12]
+	sign := string(hdr[:4])
+	version := binary.BigEndian.Uint32(hdr[4:8])
+	numEntries := binary.BigEndian.Uint32(hdr[8:])
+	//we need to check what the header says.
+	if sign != "DIRC" {
+		got.GotErr(fmt.Errorf("bad index file sha1 signature: %s", sign))
+	}
+	if version != 2 {
+		got.GotErr(fmt.Errorf("Version number must be 2, got %d", version))
+	}
+	//now for the index entries :
+	//we need to use the unix fstat
+	//the index files are listed between the 12-byte header and the 20-byte checksum
+	indEntries := data[12:(len(data) - 20)]
+	indexes := unmarshal(indEntries)
+	if len(indexes) != int(numEntries) {
+		got.GotErr(fmt.Errorf("Number of enteries does not equal to what the head specified"))
+	}
+	return indexes, nil
+}
+
+func mapStatToIndex(stat *unix.Stat_t, sha1 [20]byte, path string) *IndexEntry {
+	var i IndexEntry
 	i.ctime_s = mapint64ToBytes(stat.Ctim.Sec)
 	i.ctime_ns = mapint64ToBytes(stat.Ctim.Nsec)
 	i.mtime_s = mapint64ToBytes(stat.Mtim.Sec)
@@ -106,15 +162,15 @@ func mapint64ToBytes(t int64) [4]byte {
 }
 
 //futzing around, thinking I might have need for doing this.
-//Index is implementing the io.Reader interface
-func (i *Index) Read(b []byte) (int, error) {
+//IndexEntry is implementing the io.Reader interface
+func (i *IndexEntry) Read(b []byte) (int, error) {
 	res := i.marshall()
 	n := copy(b, res)
 	return n, nil
 }
 
 //marshall an index into bytes
-func (i *Index) marshall() []byte {
+func (i *IndexEntry) marshall() []byte {
 	//I see no poit catching errors, these ops are not I/O. Only cpu failure here, I think
 	var b bytes.Buffer
 	b.Write(i.ctime_s[:])
@@ -141,8 +197,8 @@ func (i *Index) marshall() []byte {
 	b.Write(space_fill)
 	return b.Bytes()
 }
-func destructureIntoIndex(b []byte) Index {
-	var i Index
+func destructureIntoIndex(b []byte) IndexEntry {
+	var i IndexEntry
 	start, lim := 0, 4
 	//closure crunches the four-byters
 	get_next_four := func(b []byte) [4]byte {
@@ -191,9 +247,9 @@ func destructureIntoIndex(b []byte) Index {
 
 	return i
 }
-func unmarshal(data []byte) []Index {
+func unmarshal(data []byte) []IndexEntry {
 	//length of deterministic bytes = 64
-	var indexEntries []Index
+	var indexEntries []IndexEntry
 	//here, I chose to use a bufio Scanner, because it makes reading the bytes easier. I could just set a custom scanner split func
 	bufData := bytes.NewReader(data)
 	scanner := bufio.NewScanner(bufData)
@@ -228,62 +284,10 @@ func unmarshal(data []byte) []Index {
 	return indexEntries
 }
 
-// read: https://mincong.io/2018/04/28/git-index/
-//The index file contains:
-// 12-byte header.
-// A number of sorted index entries.
-// Extensions. They are identified by signature.
-// 160-bit SHA-1 over the content of the index file before this checksum.
-
-func readIndexFile(got *Got) ([]Index, error) {
-	if is, _ := IsGit(); !is {
-		got.logger.Fatalf("Not a valid git directory\n")
-	}
-	f, err := os.Open(filepath.Join(".git/index"))
-	p_err, ok := err.(*os.PathError)
-	if ok {
-		temp_err := errors.New("no such file or directory")
-		if p_err.Unwrap() == temp_err {
-			got.logger.Fatalf("You have not indexed any file\n")
-		}
-	} else {
-		got.UpErr(err)
-		return nil, err
-	}
-	data, err := io.ReadAll(f)
-	got.GotErr(err)
-	hash := justhash(data[:len(data)-20])
-	//the index file has the lst 160 bits (i.e. 20 bytes) as the sha-1 checksum of all the bits tat come before it
-	//we need to ensure that it matches before considering the data valid
-	if bytes.Compare(hash[:], data[:(len(data)-20)]) != 0 {
-		got.GotErr(errors.New("Checksum is not equal to file digest. File has been tampered with"))
-	}
-	hdr := data[:12]
-	sign := string(hdr[:4])
-	version := binary.BigEndian.Uint32(hdr[4:8])
-	numEntries := binary.BigEndian.Uint32(hdr[8:])
-	//we need to check what the header says.
-	if sign != "DIRC" {
-		got.GotErr(fmt.Errorf("bad index file sha1 signature: %s", sign))
-	}
-	if version != 2 {
-		got.GotErr(fmt.Errorf("Version number must be 2, got %d", version))
-	}
-	//now for the index entries :
-	//we need to use the unix fstat
-	//the index files are listed between the 12-byte header and the 20-byte checksum
-	indEntries := data[12:(len(data) - 20)]
-	indexes := unmarshal(indEntries)
-	if len(indexes) != int(numEntries) {
-		got.GotErr(fmt.Errorf("Number of enteries does not equal to what the head specified"))
-	}
-	return indexes, nil
-}
-
 //write the index file, given a slice of index
 //this is the function that stages files
-//Index file integers in git are written in NE.
-func (got *Got) UpdateIndex(entries []*Index) error {
+//IndexEntry file integers in git are written in NE.
+func (got *Got) UpdateIndex(entries []*IndexEntry) error {
 	var hdr []byte
 	hdr = append(hdr, []byte("DIRC")...)
 	//buf is apparently reusable

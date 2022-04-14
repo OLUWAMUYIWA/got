@@ -1,8 +1,8 @@
 package main
 
 import (
-	"os"
 	"github.com/OLUWAMUYIWA/got/cli/cmd"
+	"os"
 )
 
 // isnt this main function neat?

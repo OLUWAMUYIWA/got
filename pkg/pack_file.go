@@ -32,7 +32,6 @@ func (p *PackErr) Unwrap() error {
 	return p.Inner
 }
 
-
 //IMPORTANT:
 //source: https://github.com/git/git/blob/master/Documentation/technical/pack-format.txt
 
@@ -322,7 +321,7 @@ func parseIdxFile(r io.ReadCloser) ([]idx, []byte, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	if err := checkCRC(valuesCRC32Flat); err != nil {
+	if !checkCRC(valuesCRC32Flat) {
 		return nil, nil, fmt.Errorf("Cyclic Redundancy Check failed")
 	}
 	offFlat := make([]byte, objNum*4)

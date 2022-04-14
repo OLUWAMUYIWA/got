@@ -5,13 +5,12 @@ import (
 	"strings"
 )
 
-
 // Example of valid refspec: "+refs/heads/*:refs/remotes/origin/*"
 type RefSpecRaw string
 
 type RefSpec struct {
 	ForceUp, Delete bool
-	Src, Dst string
+	Src, Dst        string
 }
 
 func (r *RefSpecRaw) Parse() (*RefSpec, error) {
@@ -27,7 +26,7 @@ func (r *RefSpecRaw) Parse() (*RefSpec, error) {
 	}
 
 	res := &RefSpec{}
-	
+
 	src, dst := "", ""
 
 	// if splits is just one, then `src` does not exist, and refspec is delete
@@ -58,4 +57,3 @@ func (r *RefSpecRaw) Parse() (*RefSpec, error) {
 
 	return res, nil
 }
-

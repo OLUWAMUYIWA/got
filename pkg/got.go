@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 )
 
-
 type Got struct {
 	baseDir string
 	head    *Ref
@@ -36,8 +35,8 @@ func NewGot() *Got {
 	if err != nil {
 		log.Fatalf("Could not get the working directory: %s\n", err)
 	}
-	baseDir:= wd
-	
+	baseDir := wd
+
 	//we need the head here
 	head, err := RefFromSym(filepath.Join(baseDir, "HEAD"), 0)
 	if err != nil {
@@ -47,7 +46,7 @@ func NewGot() *Got {
 		log.Fatalf("Error while reading the HEAD file: %s\n", err)
 	}
 
-	logger := log.New(os.Stdout, "GOT library: ", log.Ldate | log.Ltime)
+	logger := log.New(os.Stdout, "GOT library: ", log.Ldate|log.Ltime)
 	logger.Println("Got Library: ")
 	return &Got{baseDir: baseDir, logger: logger, head: head}
 }

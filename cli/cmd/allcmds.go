@@ -18,18 +18,17 @@ type Runner interface {
 	Run(ctx context.Context) error
 }
 
-type initializer struct{
+type initializer struct {
 	wkdir string
 }
 
 func (i *initializer) Run(ctx context.Context) error {
-	return  pkg.Init((*i).wkdir)
+	return pkg.Init((*i).wkdir)
 }
-
 
 type add struct {
 	addFlag bool
-	args []string
+	args    []string
 }
 
 func (a *add) Run(ctx context.Context) error {
@@ -40,9 +39,8 @@ func (a *add) Run(ctx context.Context) error {
 	return got.Add(a.addFlag, a.args...)
 }
 
-
 type branch struct {
-	name string
+	name   string
 	delete bool
 }
 
@@ -55,14 +53,14 @@ type catType int
 const (
 	s catType = iota
 	t
-	p 
-
+	p
 )
+
 // Provide content or type and size information for repository objects
 type cat struct {
-	prefix string
+	prefix              string
 	size, _type, pretty bool
-	mode catType
+	mode                catType
 }
 
 func (c *cat) valid() bool {
@@ -86,14 +84,14 @@ func (c *cat) valid() bool {
 	return false
 
 }
-func(c *cat) Run(ctx context.Context) error {
+func (c *cat) Run(ctx context.Context) error {
 	if !c.valid() {
 		return fmt.Errorf("Problem validating arguments, more than one of -t, -s, -p is set, or none is")
 	}
 	got := pkg.NewGot()
-	if c.size  {
+	if c.size {
 		c.mode = s
-	} else if c._type  {
+	} else if c._type {
 		c.mode = t
 	} else {
 		c.mode = p
@@ -107,36 +105,32 @@ func(c *cat) Run(ctx context.Context) error {
 	return err
 }
 
-
-
 type commit struct {
 	all bool
 	msg string
-} 
+}
 
 func (c *commit) Run(ctx context.Context) error {
 	got := pkg.NewGot()
 	if c.msg == "" {
-		return fmt.Errorf("message should not be empty") 
+		return fmt.Errorf("message should not be empty")
 	}
 	//comeback. we're doing nothing with the string returned here
 	_, err := got.Commit((*c).msg, c.all)
 	return err
 }
 
-
-// Show changes between the working tree and the index or a tree, changes between the index and a tree, 
-//changes between two trees, 
+// Show changes between the working tree and the index or a tree, changes between the index and a tree,
+//changes between two trees,
 // changes resulting from a merge, changes between two blob objects, or changes between two files on disk.
-
 
 // we limit our diff command here. if an arg is provided, we find the diff between the current working tree
 // and the last commit (not the index).
-// if cached is set, it means we expect no argument, and we wish to find the diff between the current state 
+// if cached is set, it means we expect no argument, and we wish to find the diff between the current state
 // of the index file and the files being tracked by it in the working tree. otherwise, we'll be diffing for
 // files that are not yet being tracked
 type diff struct {
-	cached bool
+	cached      bool
 	output, arg string
 }
 
@@ -150,17 +144,16 @@ func (d *diff) Run(ctx context.Context) error {
 
 type rm struct {
 	cached bool
-	paths []string
+	paths  []string
 }
 
 func (a *rm) Run(ctx context.Context) error {
 	got := pkg.NewGot()
 	if err := got.Rm(a.cached, a.paths); err != nil {
-			return err
+		return err
 	}
 	return nil
 }
-
 
 type lsFiles struct {
 	lstaged, lcached, ldeleted, lmodified, lothers bool
@@ -174,10 +167,9 @@ func (l *lsFiles) Run(ctx context.Context) error {
 
 type _switch struct {
 	name string
-	new bool
+	new  bool
 }
 
 func (s *_switch) Run(ctx context.Context) error {
 	return nil
 }
-

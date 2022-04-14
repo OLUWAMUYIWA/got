@@ -57,7 +57,7 @@ const (
 //default RefSpecs
 const (
 	FetchRefSpec = "+refs/heads/*:refs/remotes/%s/*"
-	PushRefSpec = "refs/heads/*:refs/heads/*"
+	PushRefSpec  = "refs/heads/*:refs/heads/*"
 )
 
 var (

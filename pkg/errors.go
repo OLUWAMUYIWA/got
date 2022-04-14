@@ -26,13 +26,12 @@ var (
 	IOCreateErr   = &OpErr{Context: "Could not create file/ directory:"}
 	IoReadErr     = &OpErr{Context: "Could not read file:"}
 	Incomplete    = &OpErr{Context: "Object Incomplete"}
-
-	
 )
-func ArgsIncomplete()  error {
-		argsIncompleteErr := &OpErr{Context: "Argument not complete"}
-		return argsIncompleteErr
-	
+
+func ArgsIncomplete() error {
+	argsIncompleteErr := &OpErr{Context: "Argument not complete"}
+	return argsIncompleteErr
+
 }
 
 func (e *OpErr) Unwrap() error {
@@ -53,7 +52,6 @@ func (e OpErr) Wrap(err error) OpErr {
 	e.inner = err
 	return e
 }
-
 
 //comback remove os.Exit(). program should only exit at main.main. here, I want to return an error value that directly causes the program to exit at the main function with a non-zero code
 /// |||The Got panic error handler |||| ///
