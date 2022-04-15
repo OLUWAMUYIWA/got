@@ -3,7 +3,7 @@ package pkg
 import "encoding/binary"
 
 
-var crcTable [256]uint32 = [256]uint32{
+var crcTableIEEE [256]uint32 = [256]uint32{
 	0x00000000, 0x77073096, 0xee0e612c, 0x990951ba, 0x076dc419, 0x706af48f,
 	0xe963a535, 0x9e6495a3,	0x0edb8832, 0x79dcb8a4, 0xe0d5e91e, 0x97d2d988,
 	0x09b64c2b, 0x7eb17cbd, 0xe7b82d07, 0x90bf1d91, 0x1db71064, 0x6ab020f2,
@@ -51,35 +51,34 @@ var crcTable [256]uint32 = [256]uint32{
 
 
 //comeback to know if the table we used is the right one
-func crc32 (data []byte) uint32 {
+func crc32IEEE (data []byte) uint32 {
 	//data = append(data, make([]byte, 8, 8)...)
 	var reg uint32
 	for _, b := range data {
 		msb := int((reg >> 24) & 0xff ) // pop out the msb 
 		reg = (reg << 8) | uint32(b)
-		reg = reg ^ crcTable[msb]
+		reg = reg ^ crcTableIEEE[msb]
 	}
 
 	for i := 0; i < 4; i++ {
-		reg = (reg << 8) ^ crcTable[int((reg >> 24) & 0xff)]
+		reg = (reg << 8) ^ crcTableIEEE[int((reg >> 24) & 0xff)]
 	}
 	return reg
 }
 
 func appendCrc32(data []byte) []byte {
-	crc := crc32(data)
+	crc := crc32IEEE(data)
 	var crcBytes [4]byte
 	binary.BigEndian.PutUint32(crcBytes[:], crc)
 	data = append(data, crcBytes[:]...)
 	return data
 }
 
-// the crc32 polynomial:   X^32+X^26+X^23+X^22+X^16+X^12+X^11+X^10+X^8+X^7+X^5+X^4+X^2+X^1+X^0
-func checkCRC(data []byte) bool {
-
-	// checksumBytes := data[len(data)-4:]
-	// checksum := binary.BigEndian.Uint32(checksumBytes)
+// the crc32IEEE polynomial:   X^32+X^26+X^23+X^22+X^16+X^12+X^11+X^10+X^8+X^7+X^5+X^4+X^2+X^1+X^0
+func CheckCRC(data []byte) bool {
 	// var poly uint64 = 0b100000100110000010001110110110111 // poly is 33 bits wide
-	//comeback
-	return false
+	checksumBytes := data[len(data)-4:]
+	data = data[:len(data)-4]
+	checksum := binary.BigEndian.Uint32(checksumBytes)
+	return crc32IEEE(data) == checksum
 }
