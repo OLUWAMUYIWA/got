@@ -206,7 +206,7 @@ func (g *Got) rmPaths(cached bool, paths ...string) error {
 //https://github.com/git/git/blob/master/Documentation/technical/pack-protocol.txt
 //Commit first writes the tree from the set of staged objects
 //we have no  commit-tree method
-// comeback to fix the method. we need a way to writ the committed changes to stdout
+//comeback to fix the method. we need a way to writ the committed changes to stdout
 // comeback `all` determines whether all known files (already in index) is automatically committed
 func (got *Got) Commit(msg string, all bool) (string, error) {
 	if is, _ := IsGit(); !is {
@@ -267,25 +267,37 @@ func (got *Got) LsRemote() {
 
 //discover references available in the remote repo first
 //the remote repo has no workspace. It basically contains what is in the .git directory.
-func (got *Got) Push(url string) {
+func (got *Got) Push(url string) (string, error) {
 	if is, _ := IsGit(); !is {
-		got.logger.Fatalf("Not a valid git directory\n")
+		return "", fmt.Errorf("Not a valid git directory\n")
 	}
 	uname, passwd, err := getConfig()
 	if err != nil {
 		fmt.Println("supply a space-separated username and password")
 		_, err = fmt.Scanln(&uname, &passwd)
 		if err != nil {
-			got.logger.Fatalln("error reading username and password")
+			return "", fmt.Errorf("error reading username and password")
 		}
 	}
 	localSha, err := got.head.ReadCont()
+	if err != nil {
+		return "", err
+	}
+
 	remoteSha, err := proto.GetRemoteMasterHash(url, uname, passwd)
-	got.GotErr(err)
+	if err != nil {
+		return "", err
+	}
 	missings := got.missingObjs(string(localSha), remoteSha)
 	//TODO: inform the user
 	var s strings.Builder
 	s.WriteString(fmt.Sprintf("%s %s refs/heads/master%x report-status", remoteSha, localSha, 0))
 	//remove this
 	fmt.Println(missings)
+	return s.String(), nil
+}
+
+// comeback
+func (got *Got) Pull(remote string, rebase bool) error {
+	return nil
 }

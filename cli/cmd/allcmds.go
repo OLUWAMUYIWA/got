@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -244,6 +245,42 @@ func (l *lsTree) Run(ctx context.Context) error {
 	return err
 }
 
+type merge struct {
+	comm string
+}
+
+func (m *merge) Run(ctx context.Context) error {
+	got := pkg.NewGot()
+	return got.Merge(m.comm)
+}
+
+type pull struct {
+	remote string
+	rebase bool
+}
+
+// Incorporates changes from a remote repository into the current branch. 
+// If the current branch is behind the remote, then by default it will fast-forward the current branch to match the remote. If the current branch and the remote have diverged, 
+// the user needs to specify how to reconcile the divergent branches with --rebase
+func (p *pull) Run(ctx context.Context) error {
+	got := pkg.NewGot()
+	return got.Pull(p.remote, p.rebase)
+}
+
+// git-push - Update remote refs along with associated objects
+type push struct {
+	repo string
+}
+
+func (p *push) Run(ctx context.Context) error {
+	got := pkg.NewGot()
+	s, err := got.Push(p.repo)
+	if err != nil {
+		return err
+	}
+	_, err = os.Stdout.WriteString(s)
+	return err
+}
 
 // Displays paths that have differences between the index file and the current HEAD commit, 
 // paths that have differences between the working tree and the index file, and paths in the working tree that are not tracked by Git

@@ -469,6 +469,10 @@ func (got *Got) missingObjs(localSha string, remoteSha string) []string {
 
 //  |||BRANCHING|||| //
 // comeback to implement
+
+func (got *Got) Merge(comm string) error {
+	return nil
+}
 func (got *Got) Branches() (io.Reader, error ){
 	var b bytes.Buffer
 	return &b, nil

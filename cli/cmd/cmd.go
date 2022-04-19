@@ -129,10 +129,13 @@ func (a *app) parseArgs(ctx context.Context) (Runner, error) {
 	//ls-tree
 	lsTreeCmd := flag.NewFlagSet("ls-tree", flag.ExitOnError)
 
+	//merge
 	mergeCmd := flag.NewFlagSet("merge", flag.ExitOnError)
 
 	// pull
 	pullCmd := flag.NewFlagSet("pull", flag.ExitOnError)
+	var rebase bool
+	pullCmd.BoolVar(&rebase, "rebase", false, "Rebase if conflict exist")
 
 	// push
 	pushCmd := flag.NewFlagSet("push", flag.ExitOnError)
@@ -264,6 +267,21 @@ func (a *app) parseArgs(ctx context.Context) (Runner, error) {
 			}
 			return &b, nil
 		}
+	case catCmd.Parsed():
+	{
+		if len(args) == 1 {
+			if !_type && size && !pretty {
+				return &cat{prefix: args[0], mode: 0}, nil
+			} else if _type && !size && !pretty {
+				return &cat{prefix: args[0], mode: 1}, nil
+			} else if !_type && !size && pretty {
+				return &cat{prefix: args[0], mode: 2}, nil
+			} else {
+				return nil, fmt.Errorf("Only one of the three flags must be set\n")
+			}
+		}
+		return nil, fmt.Errorf("Only one argument is needed by command")
+	}
 
 	case checkoutCmd.Parsed(): {
 
@@ -278,6 +296,7 @@ func (a *app) parseArgs(ctx context.Context) (Runner, error) {
 		}, nil
 	
 	}
+
 	case commitCmd.Parsed():
 		{
 			if len(args) > 0 {
@@ -307,41 +326,6 @@ func (a *app) parseArgs(ctx context.Context) (Runner, error) {
 			}, nil
 		}
 
-	case rmvCmd.Parsed():
-		{
-			if len(args) > 0 {
-				return &rm{
-					rcached,
-					args,
-				}, nil
-			} else {
-				return nil, pkg.ArgsIncomplete()
-			}
-		}
-	case commitCmd.Parsed():
-		{
-			if len(args) != 0 {
-				return nil, pkg.ArgsIncomplete()
-			}
-			return &commit{
-				msg: cmtMsg,
-			}, nil
-		}
-	case catCmd.Parsed():
-		{
-			if len(args) == 1 {
-				if !_type && size && !pretty {
-					return &cat{prefix: args[0], mode: 0}, nil
-				} else if _type && !size && !pretty {
-					return &cat{prefix: args[0], mode: 1}, nil
-				} else if !_type && !size && pretty {
-					return &cat{prefix: args[0], mode: 2}, nil
-				} else {
-					return nil, fmt.Errorf("Only one of the three flags must be set\n")
-				}
-			}
-			return nil, fmt.Errorf("Only one argument is needed by command")
-		}
 
 	case lsTreeCmd.Parsed(): {
 		if len(args) != 1 {
@@ -351,6 +335,43 @@ func (a *app) parseArgs(ctx context.Context) (Runner, error) {
 			path: lsTreeCmd.Arg(0),
 		}, nil
 	}
+
+	case mergeCmd.Parsed(): {
+		if len(args) != 1 {
+			return nil, fmt.Errorf("Error parrsing args")
+		}
+		return &merge{
+			comm: mergeCmd.Arg(0),
+		}, nil
+	}
+
+	case pullCmd.Parsed(): {
+		if len(args) != 1 {
+			return nil, fmt.Errorf("Error parrsing args")
+		}
+		return &pull{
+			remote: pullCmd.Arg(0),
+			rebase: rebase,
+		}, nil
+	} 
+
+	case pushCmd.Parsed(): {
+		return &push{
+			repo: pushCmd.Arg(0),
+		}, nil
+	}
+	case rmvCmd.Parsed():
+	{
+		if len(args) > 0 {
+			return &rm{
+				rcached,
+				args,
+			}, nil
+		} else {
+			return nil, pkg.ArgsIncomplete()
+		}
+	}
+
 	case switchCmd.Parsed(): {
 		name := switchCmd.Arg(0)
 		if name == "" {
@@ -362,6 +383,7 @@ func (a *app) parseArgs(ctx context.Context) (Runner, error) {
 			new: newBranchSwitch,
 		}, nil
 	}
+
 	default:
 		{
 			return nil, fmt.Errorf("Error parsing flags")
