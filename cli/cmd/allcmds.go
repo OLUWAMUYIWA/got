@@ -49,6 +49,25 @@ type branch struct {
 }
 
 func (b *branch) Run(ctx context.Context) error {
+	got := pkg.NewGot()
+	if b.name == "" {
+		rdr, err := got.Branches()
+		if err != nil {
+			return err
+		}
+		_, err = io.Copy(os.Stdout, rdr)
+		return err
+	}
+
+	if b.delete {
+		err := got.DeleteBranch(b.name)
+		return err
+	}
+
+	if err := got.NewBranch(b.name); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -112,6 +131,25 @@ func (c *cat) Run(ctx context.Context) error {
 type commit struct {
 	all bool
 	msg string
+}
+
+type checkout struct {
+	name string
+	new  bool
+}
+
+func (c *checkout) Run(ctx context.Context) error {
+	got := pkg.NewGot()
+	if c.new {
+		err := got.NewBranch(c.name)
+		if err != nil {
+			return err
+		}
+	}
+	if err := got.Checkout(c.name); err != nil  {
+		return err
+	}
+	return nil
 }
 
 func (c *commit) Run(ctx context.Context) error {
@@ -219,11 +257,23 @@ func (s *status) Run(ctx context.Context) error {
 }
 
 
+// Switch to a specified branch. The working tree and the index are updated to match the branch.
+// All new commits will be added to the tip of this branch.
 type _switch struct {
 	name string
 	new  bool
 }
 
 func (s *_switch) Run(ctx context.Context) error {
+	got := pkg.NewGot()
+	if s.new {
+		err := got.NewBranch(s.name)
+		if err != nil {
+			return err
+		}
+	}
+	if err := got.Checkout(s.name); err != nil  {
+		return err
+	}
 	return nil
 }

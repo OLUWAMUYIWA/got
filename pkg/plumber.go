@@ -139,6 +139,8 @@ func (got *Got) ReadObject(prefix string) (string, string, []byte, error) {
 	return f_name, dType, data, nil
 }
 
+
+
 //CatFile displays the file info using the git logger (set as os.Stdout). It uses flags to determine what it displays
 func (got *Got) CatFile(prefix string, mode int) (io.Reader, error) {
 
@@ -463,3 +465,24 @@ func (got *Got) missingObjs(localSha string, remoteSha string) []string {
 //TODO
 //func (got *Got) Log() {}
 //output the commit info starting from the latest commit
+
+
+//  |||BRANCHING|||| //
+// comeback to implement
+func (got *Got) Branches() (io.Reader, error ){
+	var b bytes.Buffer
+	return &b, nil
+}
+
+// comeback to implement
+func (got *Got) NewBranch(name string) error {
+	return nil
+}
+
+func (got *Got) DeleteBranch(name string) error {
+	return nil
+}
+
+func (got *Got) Checkout(name string) error {
+	return nil
+}

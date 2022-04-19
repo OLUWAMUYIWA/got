@@ -63,7 +63,12 @@ func (a *app) parseArgs(ctx context.Context) (Runner, error) {
 	addCmd.BoolVar(&aall, "all", false, "Specify that all files starting from root directory should de added")
 	addCmd.BoolVar(&aall, "A", false, "Specify that all files starting from root directory should de added (shorthand)")
 
+
+	//branch
 	branchCmd := flag.NewFlagSet("branch", flag.ExitOnError)
+	var deleteBranch bool
+	branchCmd.BoolVar(&deleteBranch, "d", false, "delete the named branch")
+	branchCmd.BoolVar(&deleteBranch, "delete", false, "delete the named branch")
 
 	//cat
 	catCmd := flag.NewFlagSet("cat-file", flag.ExitOnError)
@@ -71,6 +76,12 @@ func (a *app) parseArgs(ctx context.Context) (Runner, error) {
 	catCmd.BoolVar(&size, "s", false, "specify that we only need the size")
 	catCmd.BoolVar(&_type, "t", false, "specify that we only need the type")
 	catCmd.BoolVar(&pretty, "p", false, "specify that we nned pretty printing")
+
+
+	//checkout
+	checkoutCmd := flag.NewFlagSet("checkout", flag.ExitOnError)
+	var newBranchCheckout bool
+	checkoutCmd.BoolVar(&newBranchCheckout, "b", false, "Creates a new branch and checks it out")
 
 	// commit
 	// supports only the first two ways of committing as described in https://git-scm.com/docs/git-commit
@@ -147,8 +158,9 @@ func (a *app) parseArgs(ctx context.Context) (Runner, error) {
 
 	//switch
 	switchCmd := flag.NewFlagSet("switch", flag.ExitOnError)
-	var Sname string
-	switchCmd.StringVar(&Sname, "c", "", "Creates a new branch and checks it out")
+	var newBranchSwitch bool
+	switchCmd.BoolVar(&newBranchSwitch, "c", false, "Creates a new branch and checks it out")
+	switchCmd.BoolVar(&newBranchSwitch, "C", false, "Creates a new branch and checks it out")
 
 	// update-index
 	updIndCmd := flag.NewFlagSet("update-index", flag.ExitOnError)
@@ -248,10 +260,24 @@ func (a *app) parseArgs(ctx context.Context) (Runner, error) {
 			//comebac for dekete
 			b := branch{
 				name: name,
+				delete: deleteBranch,
 			}
 			return &b, nil
 		}
 
+	case checkoutCmd.Parsed(): {
+
+		name := checkoutCmd.Arg(0)
+		if name == "" {
+			return nil, fmt.Errorf("Error parsing flags")
+		}
+
+		return &checkout{
+			name: name,
+			new: newBranchCheckout,
+		}, nil
+	
+	}
 	case commitCmd.Parsed():
 		{
 			if len(args) > 0 {
@@ -262,6 +288,7 @@ func (a *app) parseArgs(ctx context.Context) (Runner, error) {
 				all: c_all,
 			}, nil
 		}
+
 
 	case diffCmd.Parsed():
 		{
@@ -324,12 +351,20 @@ func (a *app) parseArgs(ctx context.Context) (Runner, error) {
 			path: lsTreeCmd.Arg(0),
 		}, nil
 	}
-	
+	case switchCmd.Parsed(): {
+		name := switchCmd.Arg(0)
+		if name == "" {
+			return nil, fmt.Errorf("Error parsing flags")
+		}
+
+		return &_switch{
+			name: name,
+			new: newBranchSwitch,
+		}, nil
+	}
 	default:
 		{
-			return nil, fmt.Errorf("Error parrsing flags")
+			return nil, fmt.Errorf("Error parsing flags")
 		}
 	}
-
-	return nil, fmt.Errorf("Error parrsing args")
 }
