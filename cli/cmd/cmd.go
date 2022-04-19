@@ -172,50 +172,50 @@ func (a *app) parseArgs(ctx context.Context) (Runner, error) {
 	//args[1] is our subcommand.
 	switch args[1] {
 
-	case "add":
-		addCmd.Parse(args[2:])
-	case "branch":
-		branchCmd.Parse(args[2:])
-	case "cat-file":
-		catCmd.Parse(args[2:])
-	case "commit":
-		commitCmd.Parse(args[2:])
-	case "config":
-		configCmd.Parse(args[2:])
-	case "diff":
-		diffCmd.Parse(args[2:])
-	case "fetch":
-		fetchCmd.Parse(args[2:])
-	case "hash-object":
-		hashObjCmd.Parse(args[2:])
-	case "init":
-		initCmd.Parse(args[2:])
-	case "ls-files":
-		lsFilesCmd.Parse(args[2:])
-	case "ls-tree":
-		lsTreeCmd.Parse(args[2:])
-	case "merge":
-		mergeCmd.Parse(args[2:])
-	case "pull":
-		pullCmd.Parse(args[2:])
-	case "push":
-		pushCmd.Parse(args[2:])
-	case "read-tree":
-		readTreeCmd.Parse(args[2:])
-	case "remote":
-		rmtCmd.Parse(args[2:])
-	case "status":
-		statusCmd.Parse(args[2:])
-	case "switch":
-		switchCmd.Parse(args[2:])
-	case "update-index":
-		updIndCmd.Parse(args[2:])
-	case "verify-pack":
-		verifyPackCmd.Parse(args[2:])
-	case "write-tree":
-		writeTreeCmd.Parse(args[2:])
-	default:
-		return nil, fmt.Errorf("Error parrsing flags and args")
+		case "add":
+			addCmd.Parse(args[2:])
+		case "branch":
+			branchCmd.Parse(args[2:])
+		case "cat-file":
+			catCmd.Parse(args[2:])
+		case "commit":
+			commitCmd.Parse(args[2:])
+		case "config":
+			configCmd.Parse(args[2:])
+		case "diff":
+			diffCmd.Parse(args[2:])
+		case "fetch":
+			fetchCmd.Parse(args[2:])
+		case "hash-object":
+			hashObjCmd.Parse(args[2:])
+		case "init":
+			initCmd.Parse(args[2:])
+		case "ls-files":
+			lsFilesCmd.Parse(args[2:])
+		case "ls-tree":
+			lsTreeCmd.Parse(args[2:])
+		case "merge":
+			mergeCmd.Parse(args[2:])
+		case "pull":
+			pullCmd.Parse(args[2:])
+		case "push":
+			pushCmd.Parse(args[2:])
+		case "read-tree":
+			readTreeCmd.Parse(args[2:])
+		case "remote":
+			rmtCmd.Parse(args[2:])
+		case "status":
+			statusCmd.Parse(args[2:])
+		case "switch":
+			switchCmd.Parse(args[2:])
+		case "update-index":
+			updIndCmd.Parse(args[2:])
+		case "verify-pack":
+			verifyPackCmd.Parse(args[2:])
+		case "write-tree":
+			writeTreeCmd.Parse(args[2:])
+		default:
+			return nil, fmt.Errorf("Error parrsing flags and args")
 	}
 
 	args = args[2:] //update args to no longer having the app name and the command name
@@ -254,7 +254,13 @@ func (a *app) parseArgs(ctx context.Context) (Runner, error) {
 
 	case commitCmd.Parsed():
 		{
-
+			if len(args) > 0 {
+				return nil, fmt.Errorf("Commit args parse Error: we do not support having arguments with commit")
+			}
+			return &commit{
+				msg: cmtMsg,
+				all: c_all,
+			}, nil
 		}
 
 	case diffCmd.Parsed():
@@ -270,7 +276,7 @@ func (a *app) parseArgs(ctx context.Context) (Runner, error) {
 			return &diff{
 				cached: cached,
 				output: output,
-				arg:    args[0],
+				arg:    diffCmd.Arg(0),
 			}, nil
 		}
 
@@ -310,6 +316,15 @@ func (a *app) parseArgs(ctx context.Context) (Runner, error) {
 			return nil, fmt.Errorf("Only one argument is needed by command")
 		}
 
+	case lsTreeCmd.Parsed(): {
+		if len(args) != 1 {
+			return nil, fmt.Errorf("Error parrsing args")
+		}
+		return &lsTree{
+			path: lsTreeCmd.Arg(0),
+		}, nil
+	}
+	
 	default:
 		{
 			return nil, fmt.Errorf("Error parrsing flags")

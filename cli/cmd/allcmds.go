@@ -3,6 +3,10 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"io"
+	"os"
+	"os/exec"
+	"path/filepath"
 
 	"github.com/OLUWAMUYIWA/got/pkg"
 )
@@ -113,7 +117,29 @@ type commit struct {
 func (c *commit) Run(ctx context.Context) error {
 	got := pkg.NewGot()
 	if c.msg == "" {
-		return fmt.Errorf("message should not be empty")
+		fPath := filepath.Join(os.TempDir(), "msg.txt")
+		f, err := os.OpenFile(fPath, os.O_RDWR|os.O_CREATE, 0666)
+		if err != nil {
+			return err
+		}
+		defer f.Close()
+		cmd := exec.Command(os.Getenv("EDITOR"),fPath)
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		err = cmd.Start()
+		if err!= nil {
+			return err
+		}
+		if err := cmd.Wait(); err != nil {
+			return err
+		}
+		msg, err := io.ReadAll(f)
+		if len(msg) == 0 {
+			return fmt.Errorf("You wrote no message")
+		} 
+		c.msg = string(msg)
+
 	}
 	//comeback. we're doing nothing with the string returned here
 	_, err := got.Commit((*c).msg, c.all)
@@ -164,6 +190,34 @@ func (l *lsFiles) Run(ctx context.Context) error {
 	err := got.LsFiles(l.lstaged, l.lcached, l.ldeleted, l.lmodified, l.lothers)
 	return err
 }
+
+
+// Lists the contents of a given tree object, like what "ls -a" does in the current working directory.
+// path is relative to the current working directory 
+// output format: <mode> SP <type> SP <object> TAB <file>
+type lsTree struct {
+	path string
+}
+
+func (l *lsTree) Run(ctx context.Context) error {
+	got := pkg.NewGot()
+	rdr, err := got.LsTree(l.path)
+	io.Copy(os.Stdout, rdr)
+	return err
+}
+
+
+// Displays paths that have differences between the index file and the current HEAD commit, 
+// paths that have differences between the working tree and the index file, and paths in the working tree that are not tracked by Git
+type status struct {}
+
+func (s *status) Run(ctx context.Context) error {
+	got := pkg.NewGot()
+	rdr := got.Status()
+	_, err := io.Copy(os.Stdout, rdr)
+	return err
+}
+
 
 type _switch struct {
 	name string

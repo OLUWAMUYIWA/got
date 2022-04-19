@@ -321,7 +321,7 @@ func parseIdxFile(r io.ReadCloser) ([]idx, []byte, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	if !checkCRC(valuesCRC32Flat) {
+	if !CheckCRC(valuesCRC32Flat) {
 		return nil, nil, fmt.Errorf("Cyclic Redundancy Check failed")
 	}
 	offFlat := make([]byte, objNum*4)

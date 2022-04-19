@@ -2,7 +2,9 @@ package pkg
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
+	"io"
 	"io/fs"
 	"log"
 	"os"
@@ -64,7 +66,8 @@ func (g *Got) Diff(cached bool, output, arg string) error {
 	return nil
 }
 
-func (got *Got) Status() {
+func (got *Got) Status() io.Reader {
+	var w bytes.Buffer
 	if is, _ := IsGit(); !is {
 		got.logger.Fatalf("Not a valid git directory\n")
 	}
@@ -73,18 +76,16 @@ func (got *Got) Status() {
 		got.logger.Printf("Changes to be committed:\n\n")
 	}
 	if len(modified) != 0 {
-		_, err := fmt.Fprintf(got.logger.Writer(), "Modified files: %v\n To stage changes 'git add <filenale>'\n", modified)
-		got.GotErr(err)
+		_, _ = fmt.Fprintf(&w, "Modified files: %v\n To stage changes 'git add <filenale>'\n", modified)
 	}
 	if len(deleted) != 0 {
-		_, err := fmt.Fprintf(got.logger.Writer(), "Deleted files: %v\n", deleted)
-		got.GotErr(err)
+		_, _= fmt.Fprintf(&w, "Deleted files: %v\n", deleted)
 	}
 
 	if len(added) != 0 {
-		_, err := fmt.Fprintf(got.logger.Writer(), "Untracked files. Use `git add` to start tracking: %v\n To track run 'git add <filenale>'\n", added)
-		got.GotErr(err)
+		_, _ = fmt.Fprintf(&w, "Untracked files. Use `git add` to start tracking: %v\n To track run 'git add <filenale>'\n", added)
 	}
+	return &w
 }
 
 // Add updates the index using the current content found in the working tree, to prepare the content staged for the next commit.
@@ -205,7 +206,7 @@ func (g *Got) rmPaths(cached bool, paths ...string) error {
 //https://github.com/git/git/blob/master/Documentation/technical/pack-protocol.txt
 //Commit first writes the tree from the set of staged objects
 //we have no  commit-tree method
-//comeback to fix the method. we need a way to writ the committed changes to stdout
+// comeback to fix the method. we need a way to writ the committed changes to stdout
 // comeback `all` determines whether all known files (already in index) is automatically committed
 func (got *Got) Commit(msg string, all bool) (string, error) {
 	if is, _ := IsGit(); !is {

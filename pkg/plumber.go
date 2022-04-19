@@ -411,6 +411,11 @@ func (got *Got) findTreeObjs(sha1 string) []string {
 	return objs
 }
 
+
+// comeback
+func (got *Got) LsTree(path string) (io.Reader, error) {
+	return nil, nil
+}
 func (got *Got) findCommitObjs(sha1 string) []string {
 	var objs []string
 	_, ty, data, err := got.ReadObject(sha1)
