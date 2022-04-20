@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strings"
 
 	"github.com/OLUWAMUYIWA/got/pkg"
 )
@@ -97,11 +98,15 @@ func (a *app) parseArgs(ctx context.Context) (Runner, error) {
 
 	// config
 	configCmd := flag.NewFlagSet("config", flag.ExitOnError)
+	var local, global, system bool
+	configCmd.BoolVar(&local, "local", false, "apply config locally")
+	configCmd.BoolVar(&global, "global", false, "apply config globally for user")
+	configCmd.BoolVar(&system, "system", false, "apply config system-wide for all users")
 
 	// diff
+	diffCmd := flag.NewFlagSet("diff", flag.ExitOnError)
 	var cached bool
 	var output string
-	diffCmd := flag.NewFlagSet("diff", flag.ExitOnError)
 	diffCmd.BoolVar(&cached, "cached", false, `Cached instructs git-diff to check for changes in the working tree
 	 on files that have already  been staged in the index. if its not set, git-diff
 	  checks for changes in  WT that have not been added`)
@@ -112,7 +117,10 @@ func (a *app) parseArgs(ctx context.Context) (Runner, error) {
 
 	// hash-object
 	hashObjCmd := flag.NewFlagSet("hash-object", flag.ExitOnError)
-
+	var hashW bool
+	var hashType string
+	hashObjCmd.BoolVar(&hashW, "w", false, "write")
+	hashObjCmd.StringVar(&hashType, "t", "blob", "specify obect type")
 	// initializing & configuration
 	// init
 	initCmd := flag.NewFlagSet("init", flag.ExitOnError)
@@ -219,6 +227,8 @@ func (a *app) parseArgs(ctx context.Context) (Runner, error) {
 			readTreeCmd.Parse(args[2:])
 		case "remote":
 			rmtCmd.Parse(args[2:])
+		case "rm":
+			rmvCmd.Parse(args[2:])
 		case "status":
 			statusCmd.Parse(args[2:])
 		case "switch":
@@ -267,8 +277,9 @@ func (a *app) parseArgs(ctx context.Context) (Runner, error) {
 			}
 			return &b, nil
 		}
-	case catCmd.Parsed():
-	{
+
+	case catCmd.Parsed():{
+
 		if len(args) == 1 {
 			if !_type && size && !pretty {
 				return &cat{prefix: args[0], mode: 0}, nil
@@ -298,34 +309,82 @@ func (a *app) parseArgs(ctx context.Context) (Runner, error) {
 	}
 
 	case commitCmd.Parsed():
-		{
-			if len(args) > 0 {
-				return nil, fmt.Errorf("Commit args parse Error: we do not support having arguments with commit")
-			}
-			return &commit{
-				msg: cmtMsg,
-				all: c_all,
-			}, nil
+	{
+		if len(args) > 0 {
+			return nil, fmt.Errorf("Commit args parse Error: we do not support having arguments with commit")
 		}
+		return &commit{
+			msg: cmtMsg,
+			all: c_all,
+		}, nil
+	}
 
+	case configCmd.Parsed(): {
+		cargs := configCmd.Args()
+		if len(args) < 1 {
+			return nil, fmt.Errorf("Confing suports min of one argument")
+		}
+		sekKey := strings.Split(cargs[0], ".")
+		val := ""
+		if len(cargs) == 2 {
+			val = cargs[1]
+		}
+		if len(args) > 2 {
+			return nil, fmt.Errorf("Confing suports max of two arguments")
+		}
+		return &config{
+			section: sekKey[0],
+			key: sekKey[1],
+			value: val,
+			local: local,
+			global: global,
+			system: system,
+		}, nil
+	}
 
 	case diffCmd.Parsed():
-		{
-			if len(args) > 1 {
-				return nil, fmt.Errorf("Dif parse Error: We currently support only one arg for diffs")
-			}
-
-			if cached && args[0] != "" {
-				return nil, fmt.Errorf("We do not support ")
-			}
-
-			return &diff{
-				cached: cached,
-				output: output,
-				arg:    diffCmd.Arg(0),
-			}, nil
+	{
+		if len(args) > 1 {
+			return nil, fmt.Errorf("Dif parse Error: We currently support only one arg for diffs")
 		}
 
+		if cached && args[0] != "" {
+			return nil, fmt.Errorf("We do not support ")
+		}
+
+		return &diff{
+			cached: cached,
+			output: output,
+			arg:    diffCmd.Arg(0),
+		}, nil
+	}
+	case fetchCmd.Parsed(): {
+		if len(fetchCmd.Args()) > 1 {
+			return nil, fmt.Errorf("Fetch expects zero or one arguments, namely the remote")
+		}
+		remote := ""
+		if len(fetchCmd.Args()) == 1 {
+			remote = fetchCmd.Arg(0)
+		}
+		return &fetch{remote: remote}, nil
+	}
+
+	case hashObjCmd.Parsed(): {
+		if len(fetchCmd.Args()) != 1 {
+			return nil, fmt.Errorf("Fetch expects one argument, namely the object filename")
+		}
+		
+		return &hashObj{
+			_type: hashType,
+			w: hashW,
+			file: hashObjCmd.Arg(0),
+		}, nil
+	}
+
+
+	case lsFilesCmd.Parsed(): {
+
+	}
 
 	case lsTreeCmd.Parsed(): {
 		if len(args) != 1 {
@@ -356,10 +415,15 @@ func (a *app) parseArgs(ctx context.Context) (Runner, error) {
 	} 
 
 	case pushCmd.Parsed(): {
+		if len(args) != 1 {
+			return nil, fmt.Errorf("Error parrsing args")
+		}
+
 		return &push{
 			repo: pushCmd.Arg(0),
 		}, nil
 	}
+
 	case rmvCmd.Parsed():
 	{
 		if len(args) > 0 {
@@ -382,6 +446,18 @@ func (a *app) parseArgs(ctx context.Context) (Runner, error) {
 			name: name,
 			new: newBranchSwitch,
 		}, nil
+	}
+
+	case updIndCmd.Parsed(): {
+
+	} 
+
+	case verifyPackCmd.Parsed(): {
+
+	}
+
+	case writeTreeCmd.Parsed(): {
+
 	}
 
 	default:

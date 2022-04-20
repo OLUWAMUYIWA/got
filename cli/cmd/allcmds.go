@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -129,11 +130,6 @@ func (c *cat) Run(ctx context.Context) error {
 	return err
 }
 
-type commit struct {
-	all bool
-	msg string
-}
-
 type checkout struct {
 	name string
 	new  bool
@@ -152,6 +148,13 @@ func (c *checkout) Run(ctx context.Context) error {
 	}
 	return nil
 }
+
+
+type commit struct {
+	all bool
+	msg string
+}
+
 
 func (c *commit) Run(ctx context.Context) error {
 	got := pkg.NewGot()
@@ -185,6 +188,44 @@ func (c *commit) Run(ctx context.Context) error {
 	return err
 }
 
+type config struct {
+	section, key, value string
+	local, global, system bool
+}
+
+func (c *config) validate() (int, error) {
+	var where int
+	if c.global {
+		where = 1
+	} else if c.system {
+		where = 2
+	} else {
+		where = 0
+	}
+	if (c.local && c.global) || (c.local && c.system) || (c.global && c.system) {
+		return where,  fmt.Errorf("only one of these options meay be set")
+	}
+	return where, nil
+}
+
+func (c *config) Run(ctx context.Context) error {
+	got := pkg.NewGot()
+	where, err := c.validate()
+	if err != nil {
+		return err
+	}
+	if c.value == "" {
+		rdr, err := got.ShowConf(c.section, c.key, where)
+		if err != nil {
+			return err
+		}
+		_, err = io.Copy(os.Stdout, rdr)
+		return err
+	} else {
+		return got.UpdateConf(c.section, c.key, c.value, where)
+	}
+}
+
 // Show changes between the working tree and the index or a tree, changes between the index and a tree,
 //changes between two trees,
 // changes resulting from a merge, changes between two blob objects, or changes between two files on disk.
@@ -204,6 +245,50 @@ func (d *diff) Run(ctx context.Context) error {
 
 	err := got.Diff(d.cached, d.output, d.arg)
 
+	return err
+}
+
+
+// Fetch branches and/or tags (collectively, "refs") from one or more other repositories,
+// along with the objects necessary to complete their histories.
+type fetch struct {
+	remote string
+}
+
+func (f *fetch) Run(ctx context.Context) error {
+	got := pkg.NewGot()
+	return got.Fetch(f.remote)
+}
+
+// git-hash-object - Compute object ID and optionally creates a blob from a file
+type hashObj struct {
+	_type string
+	w bool
+	file string
+}
+
+// comeback to check valid objects
+func (h *hashObj) validate() error {
+	if h._type == "" {
+		h._type = "blob"
+	}
+	if h._type != "blob" || h._type != "tree" || h._type != "commit" {
+		return fmt.Errorf("Not a valid git obect type")
+	}
+	return nil
+}
+
+func (h *hashObj) Run(ctx context.Context) error {
+	got := pkg.NewGot()
+	b, err := ioutil.ReadFile(h.file)
+	if err != nil {
+		return err
+	}
+	hash, err := got.HashObject(b, h._type, h.w)
+	if err != nil {
+		return err
+	}
+	_, err = io.WriteString(os.Stdout, hex.EncodeToString(hash[:]))
 	return err
 }
 

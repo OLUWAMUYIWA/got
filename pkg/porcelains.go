@@ -298,6 +298,13 @@ func (got *Got) Push(url string) (string, error) {
 }
 
 // comeback
+func (g *Got) Fetch(remote string) error {
+	return nil
+}
+
+
+// comeback
 func (got *Got) Pull(remote string, rebase bool) error {
 	return nil
 }
+

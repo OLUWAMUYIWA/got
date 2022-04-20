@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -104,6 +105,7 @@ func newSect(sectCount int) Section {
 		subs:  []Line{},
 	}
 }
+
 func parseConfig(basepath string) (*ConfigParse, error) {
 	// root, err := os.UserCacheDir()
 	//conf := filepath.Join(path, ".git")
@@ -240,3 +242,21 @@ func (conf *ConfigParse) Save() error {
 func InitCinfig(path string) (*ConfigParse, error) {
 	return nil, nil
 }
+
+
+const (
+	local int = iota
+	global
+	system
+)
+
+// comeback
+func (g *Got) ShowConf(section, key string, where int) (io.Reader, error) {
+	return nil, nil
+}
+
+// comeback
+func (g *Got) UpdateConf(section, key, value string, where int) error {
+	return nil
+}
+
