@@ -287,7 +287,7 @@ func unmarshal(data []byte) []IndexEntry {
 //write the index file, given a slice of index
 //this is the function that stages files
 //IndexEntry file integers in git are written in NE.
-func (got *Got) UpdateIndex(entries []*IndexEntry) error {
+func (got *Got) UpIndexEntries(entries []*IndexEntry) error {
 	var hdr []byte
 	hdr = append(hdr, []byte("DIRC")...)
 	//buf is apparently reusable
@@ -308,5 +308,10 @@ func (got *Got) UpdateIndex(entries []*IndexEntry) error {
 	if err != nil {
 		return err
 	}
+	return nil
+}
+
+// comeback
+func (got *Got) UpdateIndex(all, remove bool) error{
 	return nil
 }

@@ -198,3 +198,8 @@ func (t *Tree) Encode(wtr io.WriteCloser) error {
 	}
 	return nil
 }
+
+// comeback
+func (got *Got) ReadTree(treeish string) error {
+	return nil
+}

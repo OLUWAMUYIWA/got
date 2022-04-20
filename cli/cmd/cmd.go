@@ -121,6 +121,7 @@ func (a *app) parseArgs(ctx context.Context) (Runner, error) {
 	var hashType string
 	hashObjCmd.BoolVar(&hashW, "w", false, "write")
 	hashObjCmd.StringVar(&hashType, "t", "blob", "specify obect type")
+
 	// initializing & configuration
 	// init
 	initCmd := flag.NewFlagSet("init", flag.ExitOnError)
@@ -175,6 +176,11 @@ func (a *app) parseArgs(ctx context.Context) (Runner, error) {
 
 	// update-index
 	updIndCmd := flag.NewFlagSet("update-index", flag.ExitOnError)
+	var addInd, rmvInd bool
+	updIndCmd.BoolVar(&addInd, "add", false, `If a specified file isn’t in the index already then it’s added. 
+		Default behaviour is to ignore new files.`)
+	updIndCmd.BoolVar(&rmvInd, "add", false, `If a specified file isn’t in the index already then it’s removed. 
+		Default behaviour is to ignore removed files.`)
 
 	//verify-pack
 	verifyPackCmd := flag.NewFlagSet("verify-pack", flag.ExitOnError)
@@ -201,6 +207,8 @@ func (a *app) parseArgs(ctx context.Context) (Runner, error) {
 			branchCmd.Parse(args[2:])
 		case "cat-file":
 			catCmd.Parse(args[2:])
+		case "checkout":
+			checkoutCmd.Parse(args[2:])
 		case "commit":
 			commitCmd.Parse(args[2:])
 		case "config":
@@ -308,8 +316,7 @@ func (a *app) parseArgs(ctx context.Context) (Runner, error) {
 	
 	}
 
-	case commitCmd.Parsed():
-	{
+	case commitCmd.Parsed(): {
 		if len(args) > 0 {
 			return nil, fmt.Errorf("Commit args parse Error: we do not support having arguments with commit")
 		}
@@ -342,8 +349,7 @@ func (a *app) parseArgs(ctx context.Context) (Runner, error) {
 		}, nil
 	}
 
-	case diffCmd.Parsed():
-	{
+	case diffCmd.Parsed(): {
 		if len(args) > 1 {
 			return nil, fmt.Errorf("Dif parse Error: We currently support only one arg for diffs")
 		}
@@ -358,6 +364,7 @@ func (a *app) parseArgs(ctx context.Context) (Runner, error) {
 			arg:    diffCmd.Arg(0),
 		}, nil
 	}
+
 	case fetchCmd.Parsed(): {
 		if len(fetchCmd.Args()) > 1 {
 			return nil, fmt.Errorf("Fetch expects zero or one arguments, namely the remote")
@@ -383,7 +390,13 @@ func (a *app) parseArgs(ctx context.Context) (Runner, error) {
 
 
 	case lsFilesCmd.Parsed(): {
-
+		return &lsFiles{
+			lstaged: lstaged,
+			lcached: lcached,
+			ldeleted: ldeleted,
+			lmodified: lmodified,
+			lothers: lothers,
+		}, nil
 	}
 
 	case lsTreeCmd.Parsed(): {
@@ -424,8 +437,32 @@ func (a *app) parseArgs(ctx context.Context) (Runner, error) {
 		}, nil
 	}
 
-	case rmvCmd.Parsed():
-	{
+	case readTreeCmd.Parsed(): {
+		if len(readTreeCmd.Args()) != 1 {
+			return nil, fmt.Errorf("Error parsing flags")
+		}
+		return &readTree{
+			treeish: readTreeCmd.Arg(0),
+		}, nil
+	}
+
+	case rmtCmd.Parsed(): {
+		var rmt remote
+		if len(rmtCmd.Args()) != 2 {
+			return nil, fmt.Errorf("Remote command expects two arguments")
+		}
+		if rmtCmd.Arg(0) == "add" {
+			rmt._type = 0
+		} else if rmtCmd.Arg(0) == "remove" {
+			rmt._type = 1
+		} else {
+			return nil, fmt.Errorf("Remote command expects one of two subcommands: `add` or `remove`")
+		}
+		rmt.name = rmtCmd.Arg(0)
+		return &rmt, nil
+	} 
+
+	case rmvCmd.Parsed(): {
 		if len(args) > 0 {
 			return &rm{
 				rcached,
@@ -434,6 +471,10 @@ func (a *app) parseArgs(ctx context.Context) (Runner, error) {
 		} else {
 			return nil, pkg.ArgsIncomplete()
 		}
+	}
+
+	case statusCmd.Parsed(): {
+		return &status{}, nil
 	}
 
 	case switchCmd.Parsed(): {
@@ -449,15 +490,22 @@ func (a *app) parseArgs(ctx context.Context) (Runner, error) {
 	}
 
 	case updIndCmd.Parsed(): {
-
+		return &updateIndex{
+			add: addInd,
+			remove: rmvInd,
+		}, nil
 	} 
 
 	case verifyPackCmd.Parsed(): {
+		if len(verifyPackCmd.Args()) != 1 {
+			return nil, fmt.Errorf("Error parsing flags")
+		}
 
+		return &verifyPack{idx: verifyPackCmd.Arg(0)}, nil
 	}
 
-	case writeTreeCmd.Parsed(): {
-
+	case writeTreeCmd.Parsed(): {	
+		return &writeTree{}, nil
 	}
 
 	default:

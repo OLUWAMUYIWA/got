@@ -88,3 +88,7 @@ func verifyPack(p *proto.Pack) error {
 	}
 	return nil
 }
+
+func (got *Got) VerifyPack(idx string) error {
+	return nil
+}

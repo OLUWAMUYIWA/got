@@ -167,7 +167,7 @@ func (got *Got) addPaths(paths []string) error {
 		sort.Slice(new_inds, func(i, j int) bool {
 			return string(new_inds[i].path) < string(new_inds[j].path)
 		})
-		err = got.UpdateIndex(new_inds)
+		err = got.UpIndexEntries(new_inds)
 		if err != nil {
 			return err
 		}
@@ -305,6 +305,16 @@ func (g *Got) Fetch(remote string) error {
 
 // comeback
 func (got *Got) Pull(remote string, rebase bool) error {
+	return nil
+}
+
+// comeback
+func (got *Got) RemoteAdd(name string) error {
+	return nil
+}
+
+// comeback
+func (got *Got) RemoteRm(name string) error {
 	return nil
 }
 

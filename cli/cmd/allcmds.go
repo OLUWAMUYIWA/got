@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/OLUWAMUYIWA/got/pkg"
 )
@@ -292,18 +293,8 @@ func (h *hashObj) Run(ctx context.Context) error {
 	return err
 }
 
-type rm struct {
-	cached bool
-	paths  []string
-}
 
-func (a *rm) Run(ctx context.Context) error {
-	got := pkg.NewGot()
-	if err := got.Rm(a.cached, a.paths); err != nil {
-		return err
-	}
-	return nil
-}
+// git-ls-files - Show information about files in the index and the working tree
 
 type lsFiles struct {
 	lstaged, lcached, ldeleted, lmodified, lothers bool
@@ -314,7 +305,6 @@ func (l *lsFiles) Run(ctx context.Context) error {
 	err := got.LsFiles(l.lstaged, l.lcached, l.ldeleted, l.lmodified, l.lothers)
 	return err
 }
-
 
 // Lists the contents of a given tree object, like what "ls -a" does in the current working directory.
 // path is relative to the current working directory 
@@ -339,6 +329,7 @@ func (m *merge) Run(ctx context.Context) error {
 	return got.Merge(m.comm)
 }
 
+
 type pull struct {
 	remote string
 	rebase bool
@@ -351,6 +342,7 @@ func (p *pull) Run(ctx context.Context) error {
 	got := pkg.NewGot()
 	return got.Pull(p.remote, p.rebase)
 }
+
 
 // git-push - Update remote refs along with associated objects
 type push struct {
@@ -365,6 +357,45 @@ func (p *push) Run(ctx context.Context) error {
 	}
 	_, err = os.Stdout.WriteString(s)
 	return err
+}
+
+// git-read-tree - Reads tree information into the index
+type readTree struct {
+	treeish string
+}
+
+func (r *readTree) Run(ctx context.Context) error {
+	got := pkg.NewGot()
+	return got.ReadTree(r.treeish)
+}
+
+type remote struct {
+	name string
+	_type int
+}
+
+func (r *remote) Run(ctx context.Context) error {
+	got := pkg.NewGot()
+	if r._type == 0 {
+		return got.RemoteAdd(r.name)
+	} else if r._type == 1 {
+		return got.RemoteRm(r.name)
+	} else {
+		return fmt.Errorf("invalid subcommand for remote command")
+	}
+}
+
+type rm struct {
+	cached bool
+	paths  []string
+}
+
+func (a *rm) Run(ctx context.Context) error {
+	got := pkg.NewGot()
+	if err := got.Rm(a.cached, a.paths); err != nil {
+		return err
+	}
+	return nil
 }
 
 // Displays paths that have differences between the index file and the current HEAD commit, 
@@ -398,4 +429,40 @@ func (s *_switch) Run(ctx context.Context) error {
 		return err
 	}
 	return nil
+}
+
+
+// git-update-index - Register file contents in the working tree to the index
+type updateIndex struct {
+	add, remove bool
+}
+
+func (u *updateIndex) Run(ctx context.Context) error {
+	got := pkg.NewGot()
+	return got.UpdateIndex(u.add, u.remove)
+}
+
+// git-verify-pack - Validate packed Git archive files
+// Reads given idx file for packed Git archive created with the git pack-objects command and verifies idx file and the corresponding pack file.
+type verifyPack struct {
+	idx string 
+}
+
+// comeback
+func (v *verifyPack) Run(ctx context.Context) error {
+	got := pkg.NewGot()
+	return got.VerifyPack(v.idx)
+}
+
+// git-write-tree - Create a tree object from the current index
+// Creates a tree object using the current index. The name of the new tree object is printed to standard output.
+type writeTree struct {}
+func (w *writeTree) Run(ctx context.Context) error {
+	got := pkg.NewGot()
+	s, err := got.WriteTree()
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(os.Stdout, strings.NewReader(s))
+	return err
 }
