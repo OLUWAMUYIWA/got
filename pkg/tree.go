@@ -212,6 +212,8 @@ func (t *Tree) Find(path string) (*item, error) {
 	for i := len(pathSplits); i > 0; i-- {
 		
 	}
+
+	return nil, nil
 }
 
 // comeback

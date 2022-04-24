@@ -23,7 +23,7 @@ type Index struct {
 }
 
 
-type Index2 struct {
+type Idx struct {
 	entries []*Entry
 	cache map[string]*Entry
 }
@@ -68,8 +68,8 @@ type Entry struct {
 // Extensions. They are identified by signature.
 // 160-bit SHA-1 over the content of the index file before this checksum.
 
-func readIndexFile() (*Index, error) {
-	i := &Index{}
+func readIndexFile() (*Idx, error) {
+	i := &Idx{}
 	if is, _ := IsGit(); !is {
 		return nil, errors.New("Not a valid git directory\n")
 	}
@@ -121,9 +121,9 @@ func readIndexFile() (*Index, error) {
 	return i, nil
 }
 
-func unmarshal(data []byte) ([]*IndexEntry, error ){
+func unmarshal(data []byte) ([]*Entry, error ){
 	//length of deterministic bytes = 64
-	var indexEntries []*IndexEntry
+	var indexEntries []*Entry
 	b := bufio.NewReader(bytes.NewReader(data))
 	for {
 		//the pre-path length is 62 bytes
@@ -140,7 +140,7 @@ func unmarshal(data []byte) ([]*IndexEntry, error ){
 		} else {
 			buf = append(buf, p[:len(p)-1]...) //exclude the delemiter since `ReadBytes` includes the delimiter
 		}
-		indexEntries = append(indexEntries, destructureIntoIndex(buf))
+		indexEntries = append(indexEntries, destructure(buf))
 
 		// now we need to discard a specific number of bytes that were used to pad the entry
 		// since in writing the index, we paded the entry to a multiple of eight bytes while keeping the name NUL-terminated
@@ -172,74 +172,153 @@ func destructure (b []byte) *Entry {
 	return e
 }
 
-func destructureIntoIndex(b []byte) *IndexEntry {
-	var i *IndexEntry
+// func destructureIntoIndex(b []byte) *IndexEntry {
+// 	var i *IndexEntry
 
-	start, lim := 0, 4
-	//closure crunches the four-byters
-	get_next_four := func(b []byte) [4]byte {
-		var arr [4]byte
-		for i, pos := start, 0; i < lim; i, pos = i+1, pos+1 {
-			arr[pos] = b[i]
-		}
-		start, lim = start+4, lim+4
-		return arr
-	}
-	i.ctime_s = get_next_four(b)
-	i.ctime_ns = get_next_four(b)
-	i.mtime_s = get_next_four(b)
-	i.mtime_ns = get_next_four(b)
-	i.dev = get_next_four(b)
-	i.inode = get_next_four(b)
-	i.mode = get_next_four(b)
-	i.uid = get_next_four(b)
-	i.gid = get_next_four(b)
-	i.f_size = get_next_four(b)
-	//now to the sha-1
-	//lim is 4 bytes ahead of start, we want it to be 20 because of sha1
-	lim += 16
-	get_next_twenty := func(b []byte) [20]byte {
-		var arr [20]byte
-		for i, pos := start, 0; i < lim; i, pos = i+1, pos+1 {
-			arr[pos] = b[i]
-		}
-		//this op levels the gap. both start and op are at the same position now
-		start, lim = start+20, lim+16
-		return arr
-	}
-	i.sha = get_next_twenty(b)
-	//now start and lim are th the same number, but incr lim by two
-	lim += 2
-	get_next_two := func(b []byte) [2]byte {
-		var arr [2]byte
-		for i, pos := start, 0; i < lim; i, pos = i+1, pos+1 {
-			arr[pos] = b[i]
-		}
-		start = start + 2
-		return arr
-	}
-	i.flags = get_next_two(b)
-	i.path = b[lim:]
+// 	start, lim := 0, 4
+// 	//closure crunches the four-byters
+// 	get_next_four := func(b []byte) [4]byte {
+// 		var arr [4]byte
+// 		for i, pos := start, 0; i < lim; i, pos = i+1, pos+1 {
+// 			arr[pos] = b[i]
+// 		}
+// 		start, lim = start+4, lim+4
+// 		return arr
+// 	}
+// 	i.ctime_s = get_next_four(b)
+// 	i.ctime_ns = get_next_four(b)
+// 	i.mtime_s = get_next_four(b)
+// 	i.mtime_ns = get_next_four(b)
+// 	i.dev = get_next_four(b)
+// 	i.inode = get_next_four(b)
+// 	i.mode = get_next_four(b)
+// 	i.uid = get_next_four(b)
+// 	i.gid = get_next_four(b)
+// 	i.f_size = get_next_four(b)
+// 	//now to the sha-1
+// 	//lim is 4 bytes ahead of start, we want it to be 20 because of sha1
+// 	lim += 16
+// 	get_next_twenty := func(b []byte) [20]byte {
+// 		var arr [20]byte
+// 		for i, pos := start, 0; i < lim; i, pos = i+1, pos+1 {
+// 			arr[pos] = b[i]
+// 		}
+// 		//this op levels the gap. both start and op are at the same position now
+// 		start, lim = start+20, lim+16
+// 		return arr
+// 	}
+// 	i.sha = get_next_twenty(b)
+// 	//now start and lim are th the same number, but incr lim by two
+// 	lim += 2
+// 	get_next_two := func(b []byte) [2]byte {
+// 		var arr [2]byte
+// 		for i, pos := start, 0; i < lim; i, pos = i+1, pos+1 {
+// 			arr[pos] = b[i]
+// 		}
+// 		start = start + 2
+// 		return arr
+// 	}
+// 	i.flags = get_next_two(b)
+// 	i.path = b[lim:]
 
-	return i
-}
+// 	return i
+// }
 
-func newIndexEntry(path string) (*IndexEntry, error) {
-	f, err := os.Open(string(path))
+// func newIndexEntry(path string) (*IndexEntry, error) {
+// 	f, err := os.OpenFile(path, os.O_RDONLY, 0)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	blob, err := io.ReadAll(f)
+// 	sha1 := justhash(blob)
+// 	var stat unix.Stat_t
+// 	err = unix.Stat(path, &stat)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	i := mapStatToIndex(&stat, sha1, path)
+// 	i.flags = setUpFlags(path)
+// 	i.path = []byte(path)
+// 	return i, err
+// }
+
+func newIdxEntry(path string) (io.Reader, error) {
+	f, err := os.OpenFile(path, os.O_RDONLY, 0)
 	if err != nil {
 		return nil, err
 	}
-	blob, err := io.ReadAll(bufio.NewReader(f))
+	blob, err := io.ReadAll(f)
 	sha1 := justhash(blob)
 	var stat unix.Stat_t
 	err = unix.Stat(path, &stat)
 	if err != nil {
 		return nil, err
 	}
-	i := mapStatToIndex(&stat, sha1, path)
-	i.flags = setUpFlags(path)
-	i.path = []byte(path)
-	return i, err
+	return marshall(&stat, sha1, path), nil
+}
+
+func newIdx(path string) (*Entry, error) {
+	f, err := os.OpenFile(path, os.O_RDONLY, 0)
+	if err != nil {
+		return nil, err
+	}
+	blob, err := io.ReadAll(f)
+	sha1 := justhash(blob)
+	var stat unix.Stat_t
+	err = unix.Stat(path, &stat)
+	if err != nil {
+		return nil, err
+	}
+	e := Entry{
+		cTime: time.Unix(int64(stat.Ctim.Sec), int64(stat.Ctim.Nsec)),
+		mTime: time.Unix(int64(stat.Mtim.Sec), int64(stat.Mtim.Nsec)),
+		dev: uint32(stat.Dev),
+		inode: uint32(stat.Ino),
+		mode: stat.Mode,
+		uid: stat.Uid,
+		gid: stat.Gid,
+		fsize: uint32(stat.Size),
+		sha: sha1,
+		path: []byte(path),
+
+		// comeback for flag
+		flags: 0,
+	}
+
+	return &e, nil
+}
+
+func marshall(stat *unix.Stat_t, sha Sha1, path string) io.Reader {
+	var b bytes.Buffer
+	b.Grow(70) // i expect the buffer t be greater than 62. the extra 8 on top is for the path string
+	slice := make([]byte, 4)
+	binary.BigEndian.PutUint32(slice, uint32(stat.Ctim.Sec))
+	b.Write(slice)
+	binary.BigEndian.PutUint32(slice, uint32(stat.Ctim.Nsec))
+	b.Write(slice)
+	binary.BigEndian.PutUint32(slice, uint32(stat.Mtim.Sec))
+	b.Write(slice)
+	binary.BigEndian.PutUint32(slice, uint32(stat.Ctim.Nsec))
+	b.Write(slice)
+	binary.BigEndian.PutUint32(slice, uint32(stat.Dev))
+	b.Write(slice)
+	binary.BigEndian.PutUint32(slice, uint32(stat.Ino))
+	b.Write(slice)
+	binary.BigEndian.PutUint32(slice, uint32(stat.Mode))
+	b.Write(slice)
+	binary.BigEndian.PutUint32(slice, uint32(stat.Uid))
+	b.Write(slice)
+	binary.BigEndian.PutUint32(slice, uint32(stat.Gid))
+	b.Write(slice)
+	binary.BigEndian.PutUint32(slice, uint32(stat.Size))
+	b.Write(slice)
+	b.Write(sha[:])
+	flags := setUpFlags(path)
+	b.Write(flags[:])
+	buf := b.Bytes()
+	pad := 8 -(len(buf) % 8)
+	buf = append(buf, bytes.Repeat([]byte{'\x00'}, pad)...)
+	return bytes.NewReader(buf)
 }
 
 //marshall an index into bytes

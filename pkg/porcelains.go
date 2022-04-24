@@ -156,9 +156,12 @@ func (got *Got) addPaths(paths []string) error {
 			news = append(news, p)
 		}
 	}
-	var new_inds []*IndexEntry
+	var new_inds []*Entry
 	for _, new := range news {
-		ind := got.newIndexEntry(string(new))
+		ind, err := newIdx(new)
+		if err != nil {
+			return err
+		}
 		new_inds = append(new_inds, ind)
 	}
 
