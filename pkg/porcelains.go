@@ -139,7 +139,7 @@ func (got *Got) addAll() error {
 //To add files to the staging area/cache,
 //first read the index file, and compare the paths of its contents to the set of new paths you want to add
 func (got *Got) addPaths(paths []string) error {
-	indexes, err := readIndexFile(got)
+	indexes, err := readIndexFile()
 	if err != nil {
 		return err
 	}
@@ -147,7 +147,7 @@ func (got *Got) addPaths(paths []string) error {
 	var news []string
 	//couldn't quicklyfind a much better way of comparing these two
 	var index_paths []string
-	for _, ind := range indexes {
+	for _, ind := range indexes.entries {
 		index_paths = append(index_paths, string(ind.path))
 	}
 	index_paths_string := strings.Join(index_paths, " ")

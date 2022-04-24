@@ -190,22 +190,22 @@ func (got *Got) CatFile(prefix string, mode int) (io.Reader, error) {
 // comeback
 func (got *Got) LsFiles(stage, cached, deleted, modified, others bool) error {
 
-	indexes, err := readIndexFile(got)
+	idx, err := readIndexFile()
 	if err != nil {
 		return err
 	}
 
-	if len(indexes) != 0 {
+	if len(idx.entries) != 0 {
 		got.logger.Printf("No staged files\n")
 		return fmt.Errorf("No files staged")
 	}
 
-	for _, ind := range indexes {
+	for _, ind := range idx.entries {
 		path := string(ind.path)
 		if stage {
 			//eating the mode and sha1 is easy. As for the mode, we'll octal-format it later with fmt, and the sha too
 			mode := binary.BigEndian.Uint32(ind.mode[:])
-			sha1 := ind.sha1_obj_id[:]
+			sha1 := ind.sha[:]
 			//stage number is the 3rd and 4th bit in the 16-bit flag
 			//so first, we >> by 12 top put the first four bits on the rightmost
 			//then, our mask will be 0b00000011, i.e. 3, we & against (or 0000000000000011) so that we'll keep only
@@ -251,12 +251,12 @@ func (got *Got) get_status() ([]string, []string, map[string]string) {
 		return files[i] < files[j]
 	})
 	//from the index we know files that are currently staged
-	index, err := readIndexFile(got)
+	idx, err := readIndexFile()
 	if err != nil {
 		got.FatalErr(err)
 	}
-	var index_map map[string]IndexEntry
-	for _, ind := range index {
+	var index_map map[string]*IndexEntry
+	for _, ind := range idx.entries {
 		index_map[string(ind.path)] = ind
 	}
 	//stored hash in index differs from the new hash, these ones have been modified. They are being tracked
@@ -271,7 +271,7 @@ func (got *Got) get_status() ([]string, []string, map[string]string) {
 				if err != nil {
 					return
 				}
-				if hex.EncodeToString(raw[:]) != hex.EncodeToString(ind.sha1_obj_id[:]) {
+				if hex.EncodeToString(raw[:]) != hex.EncodeToString(ind.sha[:]) {
 					mod[string(ind.path)] = f_path
 				}
 			}
@@ -338,17 +338,17 @@ func (got *Got) status() {
 //WriteTree just takes the current values in the index (i.e. the staged files) and writes as tree object
 func (got *Got) WriteTree() (string, error) {
 	// we need the mode, the path from root, and the sha1
-	indexes, err := readIndexFile(got)
+	idx, err := readIndexFile()
 	if err != nil {
 		got.FatalErr(err)
 	}
-	if len(indexes) == 0 {
+	if len(idx.entries) == 0 {
 		return "", fmt.Errorf("No files staged \n")
 	}
 	var b bytes.Buffer
-	for _, ind := range indexes {
+	for _, ind := range idx.entries {
 		mode := binary.BigEndian.Uint32(ind.mode[:])
-		s := fmt.Sprintf("%o %s%v%v", mode, ind.path, Sep, ind.sha1_obj_id)
+		s := fmt.Sprintf("%o %s%v%v", mode, ind.path, Sep, ind.sha)
 		b.Write([]byte(s))
 	}
 	tree := Tree{

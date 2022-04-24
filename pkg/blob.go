@@ -10,7 +10,7 @@ import (
 
 type Blob struct {
 	sha  Sha1
-	size int
+	size int64
 	//uncompressed data
 	data []byte
 }
@@ -24,6 +24,10 @@ func (c *Blob) Type() string {
 	return "blob"
 }
 
+func (c *Blob) String() string {
+	return "blob"
+}
+
 func parseBlob(rdr io.Reader) (*Blob, error) {
 	b := bufio.NewReader(rdr)
 	var d bytes.Buffer
@@ -33,7 +37,7 @@ func parseBlob(rdr io.Reader) (*Blob, error) {
 			return nil, fmt.Errorf("Expected blob, found: %s", ty)
 		}
 		if len, err := b.ReadBytes(Sep); err != nil {
-			blob.size = int(binary.BigEndian.Uint32(len)) //comeback
+			blob.size = int64(binary.BigEndian.Uint32(len)) //comeback
 			if _, err := io.CopyN(&d, b, int64(blob.size)); err != nil {
 				blob.data = d.Bytes()
 				return blob, nil

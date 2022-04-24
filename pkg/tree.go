@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 )
 
 // Tree OBJECT AND ITS GOT OBJECT IMPLEMENTATION!!!!!
@@ -21,6 +22,7 @@ type Tree struct {
 	data    []byte
 	cache   treeCache
 	len     int
+	cached bool
 }
 
 type treeCache struct {
@@ -71,7 +73,7 @@ func parseTree(sha string, r io.Reader) (*Tree, error) {
 	if string(_type) != "tree" {
 		return nil, fmt.Errorf("Err: should be a tree, but isn't")
 	}
-	//comeback
+	//comeback to do something with size
 	_, err = strconv.ParseInt(size, 10, 64)
 
 	for {
@@ -107,16 +109,13 @@ func parseTree(sha string, r io.Reader) (*Tree, error) {
 	}
 	//comeback to this.
 	tree.data = db.Bytes()
-
+	tree.cached = false // just to be sure
 	return tree, nil
 }
 
 //comeback
-func fullyParseTree(sha string, r io.Reader) (*Tree, error) {
-	t, err := parseTree(sha, r)
-	if err != nil {
-		return nil, err
-	}
+// expects a partially parsed tree object as its receiver
+func (t *Tree) fullyParseTree() (error) {
 
 	for _, item := range t.entries {
 		if modType(item.mode) == blobfile {
@@ -124,19 +123,21 @@ func fullyParseTree(sha string, r io.Reader) (*Tree, error) {
 		} else {
 			path := hex.EncodeToString(item.sha[:])
 			f, err := os.OpenFile(filepath.Join("", path[:2], path[2:]), os.O_RDONLY, 0)
+			defer f.Close()
 			if err != nil {
-				return nil, err
+				return  err
 			}
-			currT, err := fullyParseTree("", f)
+			thisTree, err := parseTree(path, f)
+
 			if err != nil {
-				return nil, err
+				return err
 			}
-			t.cache.subTrees[item.name] = currT
-			f.Close()
+			t.cache.subTrees[item.name] = thisTree
 		}
 
 	}
-	return t, nil
+	t.cached = true
+	return  nil
 }
 
 type fileType uint8
@@ -199,7 +200,22 @@ func (t *Tree) Encode(wtr io.WriteCloser) error {
 	return nil
 }
 
+func (t *Tree) Find(path string) (*item, error) {
+	// first ensure we have a fully cached tree
+	if !t.cached {
+		if err := t.fullyParseTree(); err != nil {
+			return nil, err
+		}
+	}
+
+	pathSplits := strings.Split(path, string(os.PathSeparator))
+	for i := len(pathSplits); i > 0; i-- {
+		
+	}
+}
+
 // comeback
 func (got *Got) ReadTree(treeish string) error {
 	return nil
 }
+
