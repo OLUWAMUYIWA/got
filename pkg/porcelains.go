@@ -50,9 +50,6 @@ func Init(name string) error {
 	}
 	//we create the HEAD file, a pointer to the current branch
 	headPath := filepath.Join(n, "HEAD")
-	if _, err := os.Create(headPath); err != nil {
-		return err
-	}
 	//init with the ref at  master
 	if err := writeToFile(headPath, []byte("ref: refs/heads/master")); err != nil {
 		return err
@@ -156,9 +153,9 @@ func (got *Got) addPaths(paths []string) error {
 			news = append(news, p)
 		}
 	}
-	var new_inds []*Entry
+	var new_inds []*IdxEntry
 	for _, new := range news {
-		ind, err := newIdx(new)
+		ind, err := newIdxEntry(new)
 		if err != nil {
 			return err
 		}

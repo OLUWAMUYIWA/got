@@ -254,7 +254,7 @@ func (got *Got) get_status() ([]string, []string, map[string]string) {
 	if err != nil {
 		got.FatalErr(err)
 	}
-	var index_map map[string]*Entry
+	var index_map map[string]*IdxEntry
 	for _, ind := range idx.entries {
 		index_map[string(ind.path)] = ind
 	}

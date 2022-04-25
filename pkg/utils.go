@@ -58,8 +58,10 @@ func getConfig() (string, string, error) {
 // 	return dmp.DiffPrettyText(diffs)
 // }
 
+// writeToFile writes to a file, given both the path to it and the bytes to be written
+// it appends if the file exists already, and creates if it doesn't. that's the behaviour
 func writeToFile(path string, b []byte) error {
-	f, err := os.OpenFile(path, os.O_APPEND, 0)
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 	defer f.Close()
 	if err != nil {return err}
 
