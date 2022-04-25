@@ -190,7 +190,7 @@ func mapStatToEntry(stat *unix.Stat_t, path string, sha1 Sha1) *IdxEntry {
 		path: []byte(path),
 
 		// comeback for flag
-		flags: 0,
+		flags: setFlags(path),
 	}
 
 	return &e
@@ -221,7 +221,7 @@ func (e *IdxEntry) marshall() io.Reader {
 	binary.BigEndian.PutUint32(slice, e.fsize)
 	b.Write(slice)
 	b.Write(e.sha[:])
-	flags := setUpFlags(string(e.path))
+	flags := encodeFlags(string(e.path))
 	b.Write(flags[:])
 	buf := b.Bytes()
 	pad := 8 -(len(buf) % 8)
@@ -234,7 +234,7 @@ func (e *IdxEntry) marshall() io.Reader {
 //12-bit name length if the length is less than 0xFFF, otherwise 0xFFF is stored in this field.
 //comeback: check
 //The value is 9 in decimal, or 0x9.
-func setUpFlags(name string) [2]byte {
+func encodeFlags(name string) [2]byte {
 	i := int16(0)
 	l := len(name)
 	if l > 0xFFF {
@@ -249,6 +249,14 @@ func setUpFlags(name string) [2]byte {
 }
 
 
+func setFlags(name string) uint16 {
+	i := uint16(0)
+	l := len(name)
+	if l > 0xFFF {
+		i = 0xFFF
+	}
+	return i
+}
 
 
 
@@ -257,8 +265,7 @@ func setUpFlags(name string) [2]byte {
 //write the index file, given a slice of index
 //this is the function that stages files
 //IndexEntry file integers in git are written in NE.
-func (got *Got) UpIndexEntries(idx *Idx) error {
-	entries := idx.entries
+func (got *Got) UpIndexEntries(entries []*IdxEntry) error {
 	var hdr []byte
 	hdr = append(hdr, []byte("DIRC")...)
 	//buf is apparently reusable
@@ -297,10 +304,10 @@ func (got *Got) UpdateIndex(all, remove bool) error{
 	return nil
 }
 
-func (i *Index) Append(path string)  {
+func (i *Idx) Append(path string)  {
 
 }
 
-func (i *Index) Remove(path string) error {
+func (i *Idx) Remove(path string) error {
 	return nil
 }

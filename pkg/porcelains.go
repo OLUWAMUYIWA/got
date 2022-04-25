@@ -251,10 +251,11 @@ func (got *Got) Commit(msg string, all bool) (string, error) {
 	//write the commit to refs/head/master. replace, no append
 	//this becomes the latest commit in the master branch.
 	//the refs/head/master is a symbolic to the
-	f, err := os.OpenFile(path, os.O_RDWR, 0777)
+	f, err := os.OpenFile(path, os.O_RDWR, 0666)
 	got.GotErr(err)
 	buf_f := bufio.NewWriter(f)
 	_, err = buf_f.WriteString(commit.sha)
+	buf_f.Flush()
 	got.GotErr(err)
 	os.Stdout.WriteString("Commit succeded")
 	return commit.sha, nil

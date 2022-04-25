@@ -66,8 +66,10 @@ func writeToFile(path string, b []byte) error {
 	if err != nil {return err}
 
 	bf := bufio.NewWriter(f)
-	_, err = bf.Write(b)
-	return err
+	if _, err = bf.Write(b); err != nil {
+		return err
+	}
+	return bf.Flush()
 }
 
 //zlib compress
