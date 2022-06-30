@@ -3,6 +3,7 @@ package pkg
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"crypto/sha1"
 	"encoding/binary"
 	"errors"
@@ -20,19 +21,17 @@ import (
 // https://github.com/git/git/blob/master/Documentation/technical/index-format.txt
 type Idx struct {
 	entries []*IdxEntry
-	cache map[string]*IdxEntry
+	cache   map[string]*IdxEntry
 }
 
 type IdxEntry struct {
-	cTime time.Time
-	mTime time.Time
+	cTime                             time.Time
+	mTime                             time.Time
 	dev, inode, mode, uid, gid, fsize uint32
-	sha [20]byte
-	flags uint16
-	path []byte
+	sha                               [20]byte
+	flags                             uint16
+	path                              []byte
 }
-
-
 
 // read: https://mincong.io/2018/04/28/git-index/
 //The index file contains:
@@ -58,7 +57,7 @@ func readIndexFile() (*Idx, error) {
 	}
 
 	data, err := io.ReadAll(f)
-	if err !=  nil {
+	if err != nil {
 		return nil, err
 	}
 
@@ -94,7 +93,7 @@ func readIndexFile() (*Idx, error) {
 	return i, nil
 }
 
-func unmarshal(data []byte) ([]*IdxEntry, error ){
+func unmarshal(data []byte) ([]*IdxEntry, error) {
 	//length of deterministic bytes = 64
 	var indexEntries []*IdxEntry
 	b := bufio.NewReader(bytes.NewReader(data))
@@ -118,20 +117,19 @@ func unmarshal(data []byte) ([]*IdxEntry, error ){
 		// now we need to discard a specific number of bytes that were used to pad the entry
 		// since in writing the index, we paded the entry to a multiple of eight bytes while keeping the name NUL-terminated
 		// len(buf)+1 is the length we've read so far, since we had to discard the null byte ending the name string earlier
-		adv := int(math.Ceil(float64(len(buf)+1) / 8 ) * 8 ) -  (len(buf) + 1)
+		adv := int(math.Ceil(float64(len(buf)+1)/8)*8) - (len(buf) + 1)
 		_, err = io.CopyN(io.Discard, b, int64(adv))
 		if err != nil {
 			return nil, err
 		}
 	}
-		
+
 	return indexEntries, nil
 }
 
-
-func destructure (b []byte) *IdxEntry {
+func destructure(b []byte) *IdxEntry {
 	var e *IdxEntry
-	e.cTime = time.Unix(int64(binary.BigEndian.Uint32(b[0:4])), int64(binary.BigEndian.Uint32(b[4:8]))) 
+	e.cTime = time.Unix(int64(binary.BigEndian.Uint32(b[0:4])), int64(binary.BigEndian.Uint32(b[4:8])))
 	e.mTime = time.Unix(int64(binary.BigEndian.Uint32(b[8:12])), int64(binary.BigEndian.Uint32(b[12:16])))
 	e.dev = binary.BigEndian.Uint32(b[16:20])
 	e.inode = binary.BigEndian.Uint32(b[20:24])
@@ -180,14 +178,14 @@ func mapStatToEntry(stat *unix.Stat_t, path string, sha1 Sha1) *IdxEntry {
 	e := IdxEntry{
 		cTime: time.Unix(int64(stat.Ctim.Sec), int64(stat.Ctim.Nsec)),
 		mTime: time.Unix(int64(stat.Mtim.Sec), int64(stat.Mtim.Nsec)),
-		dev: uint32(stat.Dev),
+		dev:   uint32(stat.Dev),
 		inode: uint32(stat.Ino),
-		mode: stat.Mode,
-		uid: stat.Uid,
-		gid: stat.Gid,
+		mode:  stat.Mode,
+		uid:   stat.Uid,
+		gid:   stat.Gid,
 		fsize: uint32(stat.Size),
-		sha: sha1,
-		path: []byte(path),
+		sha:   sha1,
+		path:  []byte(path),
 
 		// comeback for flag
 		flags: setFlags(path),
@@ -224,11 +222,10 @@ func (e *IdxEntry) marshall() io.Reader {
 	flags := encodeFlags(string(e.path))
 	b.Write(flags[:])
 	buf := b.Bytes()
-	pad := 8 -(len(buf) % 8)
+	pad := 8 - (len(buf) % 8)
 	buf = append(buf, bytes.Repeat([]byte{'\x00'}, pad)...)
 	return bytes.NewReader(buf)
 }
-
 
 //1-bit assume-valid flag (false); 1-bit extended flag (must be zero in version 2); 2-bit stage (during merge);
 //12-bit name length if the length is less than 0xFFF, otherwise 0xFFF is stored in this field.
@@ -248,7 +245,6 @@ func encodeFlags(name string) [2]byte {
 	return ret
 }
 
-
 func setFlags(name string) uint16 {
 	i := uint16(0)
 	l := len(name)
@@ -257,10 +253,6 @@ func setFlags(name string) uint16 {
 	}
 	return i
 }
-
-
-
-
 
 //write the index file, given a slice of index
 //this is the function that stages files
@@ -300,11 +292,11 @@ func (got *Got) UpIndexEntries(entries []*IdxEntry) error {
 }
 
 // comeback
-func (got *Got) UpdateIndex(all, remove bool) error{
+func (got *Got) UpdateIndex(ctx context.Context, all, remove bool) error {
 	return nil
 }
 
-func (i *Idx) Append(path string)  {
+func (i *Idx) Append(path string) {
 
 }
 

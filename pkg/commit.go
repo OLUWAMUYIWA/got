@@ -159,13 +159,13 @@ func parseCommit(rdr io.Reader) (*Comm, error) {
 	return comm, nil
 }
 
-func (c *Comm) Hash(wkdir string) ([]byte, error) {
+func (c *Comm) Hash(wkdir string) (Sha1, error) {
 	b, err := HashObj(c.Type(), c.data, wkdir)
 	if err != nil {
 		c.sha = b
-		return b[:], nil
+		return b, nil
 	}
-	return nil, fmt.Errorf("Could not hash commit obect: %w", err)
+	return [20]byte{}, fmt.Errorf("Could not hash commit obect: %w", err)
 }
 
 func (c *Comm) Type() string {
@@ -201,6 +201,6 @@ func (c *Comm) Encode(w io.Writer) error {
 func (c *Comm) String() string {
 	return fmt.Sprintf(
 		"commit %s\nAuthor: %s <%s>\nDate:   %s\n\n%s\n",
-		c.Hash, c.author.name, c, c.author.email, c.author.time.Format(RFC2822), c.msg)
+		c.sha, c.author.name, c, c.author.email, c.author.time.Format(RFC2822), c.msg)
 	//comeback for indenting
 }

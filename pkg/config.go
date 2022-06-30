@@ -20,8 +20,8 @@ import (
 //we parse the git config line by line because it is human readable, editable as well as machine-readable and editable
 
 type User struct {
-	Uname string `json: uname`
-	Email string `json: email`
+	Uname string `json: Uname`
+	Email string `json: Email`
 }
 
 func Config(conf User) error {
@@ -243,7 +243,6 @@ func InitCinfig(path string) (*ConfigParse, error) {
 	return nil, nil
 }
 
-
 const (
 	local int = iota
 	global
@@ -259,4 +258,3 @@ func (g *Got) ShowConf(section, key string, where int) (io.Reader, error) {
 func (g *Got) UpdateConf(section, key, value string, where int) error {
 	return nil
 }
-

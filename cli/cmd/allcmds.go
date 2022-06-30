@@ -30,7 +30,7 @@ type initializer struct {
 }
 
 func (i *initializer) Run(ctx context.Context) error {
-	return pkg.Init((*i).wkdir)
+	return pkg.Init(ctx, (*i).wkdir)
 }
 
 type add struct {
@@ -43,7 +43,7 @@ func (a *add) Run(ctx context.Context) error {
 	if a.addFlag && len(a.args) != 0 {
 		return fmt.Errorf("Error: 'A' flag is set but arguments were provided")
 	}
-	return got.Add(a.addFlag, a.args...)
+	return got.Add(ctx, a.addFlag, a.args...)
 }
 
 type branch struct {
@@ -63,11 +63,11 @@ func (b *branch) Run(ctx context.Context) error {
 	}
 
 	if b.delete {
-		err := got.DeleteBranch(b.name)
+		err := got.DeleteBranch(ctx, b.name)
 		return err
 	}
 
-	if err := got.NewBranch(b.name); err != nil {
+	if err := got.NewBranch(ctx, b.name); err != nil {
 		return err
 	}
 
@@ -123,7 +123,7 @@ func (c *cat) Run(ctx context.Context) error {
 		c.mode = p
 	}
 
-	rdr, err := got.CatFile((*c).prefix, int((*c).mode))
+	rdr, err := got.CatFile(ctx, (*c).prefix, int((*c).mode))
 	if err == nil {
 		err := got.Log(rdr)
 		return err
@@ -139,23 +139,21 @@ type checkout struct {
 func (c *checkout) Run(ctx context.Context) error {
 	got := pkg.NewGot()
 	if c.new {
-		err := got.NewBranch(c.name)
+		err := got.NewBranch(ctx, c.name)
 		if err != nil {
 			return err
 		}
 	}
-	if err := got.Checkout(c.name); err != nil  {
+	if err := got.Checkout(ctx, c.name); err != nil {
 		return err
 	}
 	return nil
 }
 
-
 type commit struct {
 	all bool
 	msg string
 }
-
 
 func (c *commit) Run(ctx context.Context) error {
 	got := pkg.NewGot()
@@ -166,12 +164,12 @@ func (c *commit) Run(ctx context.Context) error {
 			return err
 		}
 		defer f.Close()
-		cmd := exec.Command(os.Getenv("EDITOR"),fPath)
+		cmd := exec.Command(os.Getenv("EDITOR"), fPath)
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		err = cmd.Start()
-		if err!= nil {
+		if err != nil {
 			return err
 		}
 		if err := cmd.Wait(); err != nil {
@@ -180,17 +178,17 @@ func (c *commit) Run(ctx context.Context) error {
 		msg, err := io.ReadAll(f)
 		if len(msg) == 0 {
 			return fmt.Errorf("You wrote no message")
-		} 
+		}
 		c.msg = string(msg)
 
 	}
 	//comeback. we're doing nothing with the string returned here
-	_, err := got.Commit((*c).msg, c.all)
+	_, err := got.Commit(ctx, (*c).msg, c.all)
 	return err
 }
 
 type config struct {
-	section, key, value string
+	section, key, value   string
 	local, global, system bool
 }
 
@@ -204,7 +202,7 @@ func (c *config) validate() (int, error) {
 		where = 0
 	}
 	if (c.local && c.global) || (c.local && c.system) || (c.global && c.system) {
-		return where,  fmt.Errorf("only one of these options meay be set")
+		return where, fmt.Errorf("only one of these options meay be set")
 	}
 	return where, nil
 }
@@ -249,7 +247,6 @@ func (d *diff) Run(ctx context.Context) error {
 	return err
 }
 
-
 // Fetch branches and/or tags (collectively, "refs") from one or more other repositories,
 // along with the objects necessary to complete their histories.
 type fetch struct {
@@ -258,14 +255,14 @@ type fetch struct {
 
 func (f *fetch) Run(ctx context.Context) error {
 	got := pkg.NewGot()
-	return got.Fetch(f.remote)
+	return got.Fetch(ctx, f.remote)
 }
 
 // git-hash-object - Compute object ID and optionally creates a blob from a file
 type hashObj struct {
 	_type string
-	w bool
-	file string
+	w     bool
+	file  string
 }
 
 // comeback to check valid objects
@@ -273,10 +270,10 @@ func (h *hashObj) validate() error {
 	if h._type == "" {
 		h._type = "blob"
 	}
-	if h._type != "blob" || h._type != "tree" || h._type != "commit" {
-		return fmt.Errorf("Not a valid git obect type")
+	if h._type == "blob" || h._type == "tree" || h._type == "commit" {
+		return nil
 	}
-	return nil
+	return fmt.Errorf("Not a valid git obect type")
 }
 
 func (h *hashObj) Run(ctx context.Context) error {
@@ -293,7 +290,6 @@ func (h *hashObj) Run(ctx context.Context) error {
 	return err
 }
 
-
 // git-ls-files - Show information about files in the index and the working tree
 
 type lsFiles struct {
@@ -302,12 +298,12 @@ type lsFiles struct {
 
 func (l *lsFiles) Run(ctx context.Context) error {
 	got := pkg.NewGot()
-	err := got.LsFiles(l.lstaged, l.lcached, l.ldeleted, l.lmodified, l.lothers)
+	err := got.LsFiles(ctx, l.lstaged, l.lcached, l.ldeleted, l.lmodified, l.lothers)
 	return err
 }
 
 // Lists the contents of a given tree object, like what "ls -a" does in the current working directory.
-// path is relative to the current working directory 
+// path is relative to the current working directory
 // output format: <mode> SP <type> SP <object> TAB <file>
 type lsTree struct {
 	path string
@@ -315,7 +311,7 @@ type lsTree struct {
 
 func (l *lsTree) Run(ctx context.Context) error {
 	got := pkg.NewGot()
-	rdr, err := got.LsTree(l.path)
+	rdr, err := got.LsTree(ctx, l.path)
 	io.Copy(os.Stdout, rdr)
 	return err
 }
@@ -326,23 +322,21 @@ type merge struct {
 
 func (m *merge) Run(ctx context.Context) error {
 	got := pkg.NewGot()
-	return got.Merge(m.comm)
+	return got.Merge(ctx, m.comm)
 }
-
 
 type pull struct {
 	remote string
 	rebase bool
 }
 
-// Incorporates changes from a remote repository into the current branch. 
-// If the current branch is behind the remote, then by default it will fast-forward the current branch to match the remote. If the current branch and the remote have diverged, 
+// Incorporates changes from a remote repository into the current branch.
+// If the current branch is behind the remote, then by default it will fast-forward the current branch to match the remote. If the current branch and the remote have diverged,
 // the user needs to specify how to reconcile the divergent branches with --rebase
 func (p *pull) Run(ctx context.Context) error {
 	got := pkg.NewGot()
-	return got.Pull(p.remote, p.rebase)
+	return got.Pull(ctx, p.remote, p.rebase)
 }
-
 
 // git-push - Update remote refs along with associated objects
 type push struct {
@@ -351,7 +345,7 @@ type push struct {
 
 func (p *push) Run(ctx context.Context) error {
 	got := pkg.NewGot()
-	s, err := got.Push(p.repo)
+	s, err := got.Push(ctx, p.repo)
 	if err != nil {
 		return err
 	}
@@ -370,16 +364,16 @@ func (r *readTree) Run(ctx context.Context) error {
 }
 
 type remote struct {
-	name string
+	name  string
 	_type int
 }
 
 func (r *remote) Run(ctx context.Context) error {
 	got := pkg.NewGot()
 	if r._type == 0 {
-		return got.RemoteAdd(r.name)
+		return got.RemoteAdd(ctx, r.name)
 	} else if r._type == 1 {
-		return got.RemoteRm(r.name)
+		return got.RemoteRm(ctx, r.name)
 	} else {
 		return fmt.Errorf("invalid subcommand for remote command")
 	}
@@ -392,23 +386,22 @@ type rm struct {
 
 func (a *rm) Run(ctx context.Context) error {
 	got := pkg.NewGot()
-	if err := got.Rm(a.cached, a.paths); err != nil {
+	if err := got.Rm(ctx, a.cached, a.paths); err != nil {
 		return err
 	}
 	return nil
 }
 
-// Displays paths that have differences between the index file and the current HEAD commit, 
+// Displays paths that have differences between the index file and the current HEAD commit,
 // paths that have differences between the working tree and the index file, and paths in the working tree that are not tracked by Git
-type status struct {}
+type status struct{}
 
 func (s *status) Run(ctx context.Context) error {
 	got := pkg.NewGot()
-	rdr := got.Status()
+	rdr := got.Status(ctx)
 	_, err := io.Copy(os.Stdout, rdr)
 	return err
 }
-
 
 // Switch to a specified branch. The working tree and the index are updated to match the branch.
 // All new commits will be added to the tip of this branch.
@@ -420,17 +413,16 @@ type _switch struct {
 func (s *_switch) Run(ctx context.Context) error {
 	got := pkg.NewGot()
 	if s.new {
-		err := got.NewBranch(s.name)
+		err := got.NewBranch(ctx, s.name)
 		if err != nil {
 			return err
 		}
 	}
-	if err := got.Checkout(s.name); err != nil  {
+	if err := got.Checkout(ctx, s.name); err != nil {
 		return err
 	}
 	return nil
 }
-
 
 // git-update-index - Register file contents in the working tree to the index
 type updateIndex struct {
@@ -439,27 +431,28 @@ type updateIndex struct {
 
 func (u *updateIndex) Run(ctx context.Context) error {
 	got := pkg.NewGot()
-	return got.UpdateIndex(u.add, u.remove)
+	return got.UpdateIndex(ctx, u.add, u.remove)
 }
 
 // git-verify-pack - Validate packed Git archive files
 // Reads given idx file for packed Git archive created with the git pack-objects command and verifies idx file and the corresponding pack file.
 type verifyPack struct {
-	idx string 
+	idx string
 }
 
 // comeback
 func (v *verifyPack) Run(ctx context.Context) error {
 	got := pkg.NewGot()
-	return got.VerifyPack(v.idx)
+	return got.VerifyPack(ctx, v.idx)
 }
 
 // git-write-tree - Create a tree object from the current index
 // Creates a tree object using the current index. The name of the new tree object is printed to standard output.
-type writeTree struct {}
+type writeTree struct{}
+
 func (w *writeTree) Run(ctx context.Context) error {
 	got := pkg.NewGot()
-	s, err := got.WriteTree()
+	s, err := got.WriteTree(ctx)
 	if err != nil {
 		return err
 	}

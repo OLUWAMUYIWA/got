@@ -39,7 +39,7 @@ func (e *ObjectErr) SetInner(err error) {
 }
 
 type Hasher interface {
-	Hash(wkdir string) ([]byte, error)
+	Hash(wkdir string) (Sha1, error)
 }
 
 type GotObject interface {

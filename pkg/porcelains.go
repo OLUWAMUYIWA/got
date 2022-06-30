@@ -3,6 +3,7 @@ package pkg
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"io/fs"
@@ -24,7 +25,7 @@ const TIME_FORMAT = "Mon Jan 2 15:04:05 2006 -0700"
 //Its an unfair world, but it is what it is
 //Check: https://stackoverflow.com/questions/35894613/how-to-disallow-access-to-a-file-for-one-user/35895436#35895436 on file permissions
 //Init creates a directory for your repo and initializes the hidden .git directory
-func Init(name string) error {
+func Init(ctx context.Context, name string) error {
 	n := ".git"
 	if name == "" {
 		if is, _ := IsGit(); is {
@@ -63,7 +64,7 @@ func (g *Got) Diff(cached bool, output, arg string) error {
 	return nil
 }
 
-func (got *Got) Status() io.Reader {
+func (got *Got) Status(ctx context.Context) io.Reader {
 	var w bytes.Buffer
 	if is, _ := IsGit(); !is {
 		got.logger.Fatalf("Not a valid git directory\n")
@@ -76,7 +77,7 @@ func (got *Got) Status() io.Reader {
 		_, _ = fmt.Fprintf(&w, "Modified files: %v\n To stage changes 'git add <filenale>'\n", modified)
 	}
 	if len(deleted) != 0 {
-		_, _= fmt.Fprintf(&w, "Deleted files: %v\n", deleted)
+		_, _ = fmt.Fprintf(&w, "Deleted files: %v\n", deleted)
 	}
 
 	if len(added) != 0 {
@@ -88,7 +89,7 @@ func (got *Got) Status() io.Reader {
 // Add updates the index using the current content found in the working tree, to prepare the content staged for the next commit.
 //provide full paths please
 //comebck: move parsing problems to cmd
-func (got *Got) Add(all bool, args ...string) error {
+func (got *Got) Add(ctx context.Context, all bool, args ...string) error {
 	if all {
 		return got.addAll()
 	}
@@ -183,7 +184,7 @@ func (got *Got) addPaths(paths []string) error {
 // Rm remove files matching pathspec from the index, or from the working tree and the index
 // It  will not remove a file from just your working directory
 //provide full paths please
-func (g *Got) Rm(cached bool, args []string) error {
+func (g *Got) Rm(ctx context.Context, cached bool, args []string) error {
 	var paths []string
 	for _, p := range args {
 		pList, err := fs.Glob(os.DirFS(g.WkDir()), p)
@@ -208,12 +209,12 @@ func (g *Got) rmPaths(cached bool, paths ...string) error {
 //we have no  commit-tree method
 //comeback to fix the method. we need a way to writ the committed changes to stdout
 // comeback `all` determines whether all known files (already in index) is automatically committed
-func (got *Got) Commit(msg string, all bool) (string, error) {
+func (got *Got) Commit(ctx context.Context, msg string, all bool) (string, error) {
 	if is, _ := IsGit(); !is {
 		got.logger.Fatalf("Not a valid git directory\n")
 	}
 	//write the tree object first
-	tree, err := got.WriteTree()
+	tree, err := got.WriteTree(ctx)
 	if err != nil {
 		return "", fmt.Errorf("Could not commit because: %w", err)
 	}
@@ -268,7 +269,7 @@ func (got *Got) LsRemote() {
 
 //discover references available in the remote repo first
 //the remote repo has no workspace. It basically contains what is in the .git directory.
-func (got *Got) Push(url string) (string, error) {
+func (got *Got) Push(ctx context.Context, url string) (string, error) {
 	if is, _ := IsGit(); !is {
 		return "", fmt.Errorf("Not a valid git directory\n")
 	}
@@ -299,23 +300,21 @@ func (got *Got) Push(url string) (string, error) {
 }
 
 // comeback
-func (g *Got) Fetch(remote string) error {
-	return nil
-}
-
-
-// comeback
-func (got *Got) Pull(remote string, rebase bool) error {
+func (g *Got) Fetch(ctx context.Context, remote string) error {
 	return nil
 }
 
 // comeback
-func (got *Got) RemoteAdd(name string) error {
+func (got *Got) Pull(ctx context.Context, remote string, rebase bool) error {
 	return nil
 }
 
 // comeback
-func (got *Got) RemoteRm(name string) error {
+func (got *Got) RemoteAdd(ctx context.Context, name string) error {
 	return nil
 }
 
+// comeback
+func (got *Got) RemoteRm(ctx context.Context, name string) error {
+	return nil
+}

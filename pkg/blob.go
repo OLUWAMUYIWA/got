@@ -11,13 +11,13 @@ import (
 type Blob struct {
 	sha  Sha1
 	size int64
-	//uncompressed data
+	//uncompressed data.
 	data []byte
 }
 
-func (blob *Blob) Hash(wkdir string) ([]byte, error) {
+func (blob *Blob) Hash(wkdir string) (Sha1, error) {
 	b, err := HashObj(blob.Type(), blob.data, wkdir)
-	return b[:], err
+	return b, err
 }
 
 func (c *Blob) Type() string {
@@ -28,6 +28,7 @@ func (c *Blob) String() string {
 	return "blob"
 }
 
+// parseBlob takes an io Reader (a Blob file), and parses it as an in-memory Blob
 func parseBlob(rdr io.Reader) (*Blob, error) {
 	b := bufio.NewReader(rdr)
 	var d bytes.Buffer

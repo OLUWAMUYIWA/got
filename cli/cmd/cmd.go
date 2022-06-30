@@ -18,7 +18,7 @@ type app struct {
 
 func NewApp() *app {
 	a := &app{
-		log.New(os.Stdout, "Got Command Error", log.Ldate|log.Ltime),
+		log.New(os.Stdout, "Got: ", log.LstdFlags),
 	}
 	return a
 }
@@ -58,12 +58,13 @@ func (a *app) Run() error {
 //comeback handle exit codes and context
 func (a *app) parseArgs(ctx context.Context) (Runner, error) {
 
+	// subcommands as `NewFlagSet`s
+
 	// add
 	addCmd := flag.NewFlagSet("add", flag.ExitOnError)
 	var aall bool
-	addCmd.BoolVar(&aall, "all", false, "Specify that all files starting from root directory should de added")
-	addCmd.BoolVar(&aall, "A", false, "Specify that all files starting from root directory should de added (shorthand)")
-
+	addCmd.BoolVar(&aall, "all", false, "Specify that all files starting from root directory should be added, default false")
+	addCmd.BoolVar(&aall, "A", false, "Specify that all files starting from root directory should be added (shorthand). default: false")
 
 	//branch
 	branchCmd := flag.NewFlagSet("branch", flag.ExitOnError)
@@ -77,7 +78,6 @@ func (a *app) parseArgs(ctx context.Context) (Runner, error) {
 	catCmd.BoolVar(&size, "s", false, "specify that we only need the size")
 	catCmd.BoolVar(&_type, "t", false, "specify that we only need the type")
 	catCmd.BoolVar(&pretty, "p", false, "specify that we nned pretty printing")
-
 
 	//checkout
 	checkoutCmd := flag.NewFlagSet("checkout", flag.ExitOnError)
@@ -107,9 +107,10 @@ func (a *app) parseArgs(ctx context.Context) (Runner, error) {
 	diffCmd := flag.NewFlagSet("diff", flag.ExitOnError)
 	var cached bool
 	var output string
-	diffCmd.BoolVar(&cached, "cached", false, `Cached instructs git-diff to check for changes in the working tree
+	diffCmd.BoolVar(&cached, "cached", false,
+		`Cached instructs git-diff to check for changes in the working tree
 	 on files that have already  been staged in the index. if its not set, git-diff
-	  checks for changes in  WT that have not been added`)
+	 checks for changes in  WT that have not been added`)
 	diffCmd.StringVar(&output, "output", "", "Dumps diff in file instead of standard output")
 
 	// fetch
@@ -157,7 +158,7 @@ func (a *app) parseArgs(ctx context.Context) (Runner, error) {
 
 	// rm
 	rmvCmd := flag.NewFlagSet("rm", flag.ExitOnError)
-	// comeback trick. just trying something
+	// comeback. just trying something out
 	rmvCmd.Usage = func() {
 		os.Stdout.Write([]byte("Error parsing the rm command"))
 	}
@@ -188,80 +189,80 @@ func (a *app) parseArgs(ctx context.Context) (Runner, error) {
 	//write-tree
 	writeTreeCmd := flag.NewFlagSet("write-tree", flag.ExitOnError)
 
+	// parse flags. populates flag.Args()
 	flag.Parse()
 
+	// args represent the arguments provided to the main command. unlike os.Args, it does not include the main command
 	args := flag.Args()
 
-	if len(args) < 2 {
+	if len(args) < 1 {
 		return nil, fmt.Errorf("No subcommand provided for git to work with/n")
 	}
 
 	//parse each of the subcommands, starting from the second argument.
-	//remember that args[0] will be the program binary name
-	//args[1] is our subcommand.
-	switch args[1] {
-
-		case "add":
-			addCmd.Parse(args[2:])
-		case "branch":
-			branchCmd.Parse(args[2:])
-		case "cat-file":
-			catCmd.Parse(args[2:])
-		case "checkout":
-			checkoutCmd.Parse(args[2:])
-		case "commit":
-			commitCmd.Parse(args[2:])
-		case "config":
-			configCmd.Parse(args[2:])
-		case "diff":
-			diffCmd.Parse(args[2:])
-		case "fetch":
-			fetchCmd.Parse(args[2:])
-		case "hash-object":
-			hashObjCmd.Parse(args[2:])
-		case "init":
-			initCmd.Parse(args[2:])
-		case "ls-files":
-			lsFilesCmd.Parse(args[2:])
-		case "ls-tree":
-			lsTreeCmd.Parse(args[2:])
-		case "merge":
-			mergeCmd.Parse(args[2:])
-		case "pull":
-			pullCmd.Parse(args[2:])
-		case "push":
-			pushCmd.Parse(args[2:])
-		case "read-tree":
-			readTreeCmd.Parse(args[2:])
-		case "remote":
-			rmtCmd.Parse(args[2:])
-		case "rm":
-			rmvCmd.Parse(args[2:])
-		case "status":
-			statusCmd.Parse(args[2:])
-		case "switch":
-			switchCmd.Parse(args[2:])
-		case "update-index":
-			updIndCmd.Parse(args[2:])
-		case "verify-pack":
-			verifyPackCmd.Parse(args[2:])
-		case "write-tree":
-			writeTreeCmd.Parse(args[2:])
-		default:
-			return nil, fmt.Errorf("Error parrsing flags and args")
+	// of course only one is parsed per execution of the program
+	// args[0] is our subcommand in this case (wouldve been args[1] if we had used os.Args)
+	switch args[0] {
+	// parse the flags as defined by the flag sets above
+	case "add":
+		addCmd.Parse(args[1:])
+	case "branch":
+		branchCmd.Parse(args[1:])
+	case "cat-file":
+		catCmd.Parse(args[1:])
+	case "checkout":
+		checkoutCmd.Parse(args[1:])
+	case "commit":
+		commitCmd.Parse(args[1:])
+	case "config":
+		configCmd.Parse(args[1:])
+	case "diff":
+		diffCmd.Parse(args[1:])
+	case "fetch":
+		fetchCmd.Parse(args[1:])
+	case "hash-object":
+		hashObjCmd.Parse(args[1:])
+	case "init":
+		initCmd.Parse(args[1:])
+	case "ls-files":
+		lsFilesCmd.Parse(args[1:])
+	case "ls-tree":
+		lsTreeCmd.Parse(args[1:])
+	case "merge":
+		mergeCmd.Parse(args[1:])
+	case "pull":
+		pullCmd.Parse(args[1:])
+	case "push":
+		pushCmd.Parse(args[1:])
+	case "read-tree":
+		readTreeCmd.Parse(args[1:])
+	case "remote":
+		rmtCmd.Parse(args[1:])
+	case "rm":
+		rmvCmd.Parse(args[1:])
+	case "status":
+		statusCmd.Parse(args[1:])
+	case "switch":
+		switchCmd.Parse(args[1:])
+	case "update-index":
+		updIndCmd.Parse(args[1:])
+	case "verify-pack":
+		verifyPackCmd.Parse(args[1:])
+	case "write-tree":
+		writeTreeCmd.Parse(args[1:])
+	default:
+		return nil, fmt.Errorf("Error parrsing flags and args")
 	}
-
-	args = args[2:] //update args to no longer having the app name and the command name
 
 	//now we have to go through each of the subcommands to know the one that was passed. we then execute our program logic
 	if initCmd.Parsed() {
-		if len(args) < 1 { //no path argument
-			return nil, fmt.Errorf("Init needs  the directory specified as an argument. \n. If this is the wkdir, put .")
 
+		initArgs := initCmd.Args()
+		if len(initArgs) < 1 { //no path argument provided
+			return nil, fmt.Errorf("Init needs  the directory specified as an argument. \n. If this is the wkdir, put .")
 		}
-		wkdir := args[0]
 		return &initializer{
-			wkdir,
+			initArgs[0],
 		}, nil
 	}
 
@@ -277,236 +278,255 @@ func (a *app) parseArgs(ctx context.Context) (Runner, error) {
 
 	case branchCmd.Parsed():
 		{
+			if len(branchCmd.Args()) < 1 { //no path argument provided
+				return nil, fmt.Errorf("branch needs  the name specified as an argument. \n.")
+			}
 			name := branchCmd.Arg(0)
-			//comebac for dekete
 			b := branch{
-				name: name,
+				name:   name,
 				delete: deleteBranch,
 			}
 			return &b, nil
 		}
 
-	case catCmd.Parsed():{
+	case catCmd.Parsed():
+		{
+			catArgs := catCmd.Args()
+			if len(catArgs) == 1 {
+				if !_type && size && !pretty {
+					return &cat{prefix: catArgs[0], mode: 0}, nil
+				} else if _type && !size && !pretty {
+					return &cat{prefix: catArgs[0], mode: 1}, nil
+				} else if !_type && !size && pretty {
+					return &cat{prefix: catArgs[0], mode: 2}, nil
+				} else {
+					return nil, fmt.Errorf("Only one of the three flags must be set\n")
+				}
+			}
+			return nil, fmt.Errorf("Only one argument is needed by command")
+		}
 
-		if len(args) == 1 {
-			if !_type && size && !pretty {
-				return &cat{prefix: args[0], mode: 0}, nil
-			} else if _type && !size && !pretty {
-				return &cat{prefix: args[0], mode: 1}, nil
-			} else if !_type && !size && pretty {
-				return &cat{prefix: args[0], mode: 2}, nil
+	case checkoutCmd.Parsed():
+		{
+
+			name := checkoutCmd.Arg(0)
+			if name == "" {
+				return nil, fmt.Errorf("Error parsing flags")
+			}
+
+			return &checkout{
+				name: name,
+				new:  newBranchCheckout,
+			}, nil
+
+		}
+
+	case commitCmd.Parsed():
+		{
+			if len(commitCmd.Args()) > 0 {
+				return nil, fmt.Errorf("Commit args parse Error: we do not support having arguments with commit")
+			}
+			return &commit{
+				msg: cmtMsg,
+				all: c_all,
+			}, nil
+		}
+
+	case configCmd.Parsed():
+		{
+			cargs := configCmd.Args()
+			if len(cargs) < 1 {
+				return nil, fmt.Errorf("Confing suports min of one argument")
+			}
+			sekKey := strings.Split(cargs[0], ".")
+			val := ""
+			if len(cargs) == 2 {
+				val = cargs[1]
+			}
+			if len(cargs) > 2 {
+				return nil, fmt.Errorf("Confing suports max of two arguments")
+			}
+			return &config{
+				section: sekKey[0],
+				key:     sekKey[1],
+				value:   val,
+				local:   local,
+				global:  global,
+				system:  system,
+			}, nil
+		}
+
+	case diffCmd.Parsed():
+		{
+			// cached and diff arg provided == error
+			if cached && diffCmd.Arg(0) != "" {
+				return nil, fmt.Errorf("We do not support ")
+			}
+
+			return &diff{
+				cached: cached,
+				output: output,
+				arg:    diffCmd.Arg(0),
+			}, nil
+		}
+
+	case fetchCmd.Parsed():
+		{
+			fetchArgs := fetchCmd.Args()
+			if len(fetchArgs) > 1 {
+				return nil, fmt.Errorf("Fetch expects zero or one arguments, namely the remote")
+			}
+			return &fetch{remote: fetchArgs[0]}, nil
+		}
+
+	case hashObjCmd.Parsed():
+		{
+			if len(hashObjCmd.Args()) != 1 {
+				return nil, fmt.Errorf("Fetch expects one argument, namely the object filename")
+			}
+
+			return &hashObj{
+				_type: hashType,
+				w:     hashW,
+				file:  hashObjCmd.Arg(0),
+			}, nil
+		}
+
+	case lsFilesCmd.Parsed():
+		{
+			return &lsFiles{
+				lstaged:   lstaged,
+				lcached:   lcached,
+				ldeleted:  ldeleted,
+				lmodified: lmodified,
+				lothers:   lothers,
+			}, nil
+		}
+
+	case lsTreeCmd.Parsed():
+		{
+			if len(lsTreeCmd.Args()) != 1 {
+				return nil, fmt.Errorf("Error parrsing args, expected one argument: path")
+			}
+			return &lsTree{
+				path: lsTreeCmd.Arg(0),
+			}, nil
+		}
+
+	case mergeCmd.Parsed():
+		{
+			if len(mergeCmd.Args()) != 1 {
+				return nil, fmt.Errorf("Error parrsing args. expected commit to merge")
+			}
+			return &merge{
+				comm: mergeCmd.Arg(0),
+			}, nil
+		}
+
+	case pullCmd.Parsed():
+		{
+			pullArgs := pullCmd.Args()
+			if len(pullArgs) != 1 {
+				return nil, fmt.Errorf("Error parrsing args")
+			}
+			return &pull{
+				remote: pullArgs[0],
+				rebase: rebase,
+			}, nil
+		}
+
+	case pushCmd.Parsed():
+		{
+			pushArgs := pushCmd.Args()
+			if len(pushArgs) != 1 {
+				return nil, fmt.Errorf("Error parrsing args")
+			}
+
+			return &push{
+				repo: pushArgs[0],
+			}, nil
+		}
+
+	case readTreeCmd.Parsed():
+		{
+			if len(readTreeCmd.Args()) != 1 {
+				return nil, fmt.Errorf("Error parsing flags")
+			}
+			return &readTree{
+				treeish: readTreeCmd.Arg(0),
+			}, nil
+		}
+
+	case rmtCmd.Parsed():
+		{
+			rmtArgs := rmtCmd.Args()
+			var rmt remote
+			if len(rmtArgs) != 2 {
+				return nil, fmt.Errorf("Remote command expects two arguments")
+			}
+			if rmtArgs[0] == "add" {
+				rmt._type = 0
+			} else if rmtArgs[0] == "remove" {
+				rmt._type = 1
 			} else {
-				return nil, fmt.Errorf("Only one of the three flags must be set\n")
+				return nil, fmt.Errorf("Remote command expects one of two subcommands: `add` or `remove`")
+			}
+			rmt.name = rmtArgs[1]
+			return &rmt, nil
+		}
+
+	case rmvCmd.Parsed():
+		{
+			rmvArgs := rmvCmd.Args()
+			if len(rmvArgs) > 0 {
+				return &rm{
+					rcached,
+					rmvArgs,
+				}, nil
+			} else {
+				return nil, pkg.ArgsIncomplete()
 			}
 		}
-		return nil, fmt.Errorf("Only one argument is needed by command")
-	}
 
-	case checkoutCmd.Parsed(): {
-
-		name := checkoutCmd.Arg(0)
-		if name == "" {
-			return nil, fmt.Errorf("Error parsing flags")
+	case statusCmd.Parsed():
+		{
+			return &status{}, nil
 		}
 
-		return &checkout{
-			name: name,
-			new: newBranchCheckout,
-		}, nil
-	
-	}
+	case switchCmd.Parsed():
+		{
+			name := switchCmd.Arg(0)
+			if name == "" {
+				return nil, fmt.Errorf("Error parsing flags")
+			}
 
-	case commitCmd.Parsed(): {
-		if len(args) > 0 {
-			return nil, fmt.Errorf("Commit args parse Error: we do not support having arguments with commit")
-		}
-		return &commit{
-			msg: cmtMsg,
-			all: c_all,
-		}, nil
-	}
-
-	case configCmd.Parsed(): {
-		cargs := configCmd.Args()
-		if len(args) < 1 {
-			return nil, fmt.Errorf("Confing suports min of one argument")
-		}
-		sekKey := strings.Split(cargs[0], ".")
-		val := ""
-		if len(cargs) == 2 {
-			val = cargs[1]
-		}
-		if len(args) > 2 {
-			return nil, fmt.Errorf("Confing suports max of two arguments")
-		}
-		return &config{
-			section: sekKey[0],
-			key: sekKey[1],
-			value: val,
-			local: local,
-			global: global,
-			system: system,
-		}, nil
-	}
-
-	case diffCmd.Parsed(): {
-		if len(args) > 1 {
-			return nil, fmt.Errorf("Dif parse Error: We currently support only one arg for diffs")
-		}
-
-		if cached && args[0] != "" {
-			return nil, fmt.Errorf("We do not support ")
-		}
-
-		return &diff{
-			cached: cached,
-			output: output,
-			arg:    diffCmd.Arg(0),
-		}, nil
-	}
-
-	case fetchCmd.Parsed(): {
-		if len(fetchCmd.Args()) > 1 {
-			return nil, fmt.Errorf("Fetch expects zero or one arguments, namely the remote")
-		}
-		remote := ""
-		if len(fetchCmd.Args()) == 1 {
-			remote = fetchCmd.Arg(0)
-		}
-		return &fetch{remote: remote}, nil
-	}
-
-	case hashObjCmd.Parsed(): {
-		if len(fetchCmd.Args()) != 1 {
-			return nil, fmt.Errorf("Fetch expects one argument, namely the object filename")
-		}
-		
-		return &hashObj{
-			_type: hashType,
-			w: hashW,
-			file: hashObjCmd.Arg(0),
-		}, nil
-	}
-
-
-	case lsFilesCmd.Parsed(): {
-		return &lsFiles{
-			lstaged: lstaged,
-			lcached: lcached,
-			ldeleted: ldeleted,
-			lmodified: lmodified,
-			lothers: lothers,
-		}, nil
-	}
-
-	case lsTreeCmd.Parsed(): {
-		if len(args) != 1 {
-			return nil, fmt.Errorf("Error parrsing args")
-		}
-		return &lsTree{
-			path: lsTreeCmd.Arg(0),
-		}, nil
-	}
-
-	case mergeCmd.Parsed(): {
-		if len(args) != 1 {
-			return nil, fmt.Errorf("Error parrsing args")
-		}
-		return &merge{
-			comm: mergeCmd.Arg(0),
-		}, nil
-	}
-
-	case pullCmd.Parsed(): {
-		if len(args) != 1 {
-			return nil, fmt.Errorf("Error parrsing args")
-		}
-		return &pull{
-			remote: pullCmd.Arg(0),
-			rebase: rebase,
-		}, nil
-	} 
-
-	case pushCmd.Parsed(): {
-		if len(args) != 1 {
-			return nil, fmt.Errorf("Error parrsing args")
-		}
-
-		return &push{
-			repo: pushCmd.Arg(0),
-		}, nil
-	}
-
-	case readTreeCmd.Parsed(): {
-		if len(readTreeCmd.Args()) != 1 {
-			return nil, fmt.Errorf("Error parsing flags")
-		}
-		return &readTree{
-			treeish: readTreeCmd.Arg(0),
-		}, nil
-	}
-
-	case rmtCmd.Parsed(): {
-		var rmt remote
-		if len(rmtCmd.Args()) != 2 {
-			return nil, fmt.Errorf("Remote command expects two arguments")
-		}
-		if rmtCmd.Arg(0) == "add" {
-			rmt._type = 0
-		} else if rmtCmd.Arg(0) == "remove" {
-			rmt._type = 1
-		} else {
-			return nil, fmt.Errorf("Remote command expects one of two subcommands: `add` or `remove`")
-		}
-		rmt.name = rmtCmd.Arg(0)
-		return &rmt, nil
-	} 
-
-	case rmvCmd.Parsed(): {
-		if len(args) > 0 {
-			return &rm{
-				rcached,
-				args,
+			return &_switch{
+				name: name,
+				new:  newBranchSwitch,
 			}, nil
-		} else {
-			return nil, pkg.ArgsIncomplete()
-		}
-	}
-
-	case statusCmd.Parsed(): {
-		return &status{}, nil
-	}
-
-	case switchCmd.Parsed(): {
-		name := switchCmd.Arg(0)
-		if name == "" {
-			return nil, fmt.Errorf("Error parsing flags")
 		}
 
-		return &_switch{
-			name: name,
-			new: newBranchSwitch,
-		}, nil
-	}
-
-	case updIndCmd.Parsed(): {
-		return &updateIndex{
-			add: addInd,
-			remove: rmvInd,
-		}, nil
-	} 
-
-	case verifyPackCmd.Parsed(): {
-		if len(verifyPackCmd.Args()) != 1 {
-			return nil, fmt.Errorf("Error parsing flags")
+	case updIndCmd.Parsed():
+		{
+			return &updateIndex{
+				add:    addInd,
+				remove: rmvInd,
+			}, nil
 		}
 
-		return &verifyPack{idx: verifyPackCmd.Arg(0)}, nil
-	}
+	case verifyPackCmd.Parsed():
+		{
+			if len(verifyPackCmd.Args()) != 1 {
+				return nil, fmt.Errorf("Error parsing flags")
+			}
 
-	case writeTreeCmd.Parsed(): {	
-		return &writeTree{}, nil
-	}
+			return &verifyPack{idx: verifyPackCmd.Arg(0)}, nil
+		}
+
+	case writeTreeCmd.Parsed():
+		{
+			return &writeTree{}, nil
+		}
 
 	default:
 		{

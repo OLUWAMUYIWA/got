@@ -2,6 +2,7 @@ package pkg
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"errors"
 	"os"
@@ -89,6 +90,6 @@ func verifyPack(p *proto.Pack) error {
 	return nil
 }
 
-func (got *Got) VerifyPack(idx string) error {
+func (got *Got) VerifyPack(ctx context.Context, idx string) error {
 	return nil
 }

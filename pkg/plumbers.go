@@ -2,6 +2,7 @@ package pkg
 
 import (
 	"bytes"
+	"context"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -138,10 +139,8 @@ func (got *Got) ReadObject(prefix string) (string, string, []byte, error) {
 	return f_name, dType, data, nil
 }
 
-
-
 //CatFile displays the file info using the git logger (set as os.Stdout). It uses flags to determine what it displays
-func (got *Got) CatFile(prefix string, mode int) (io.Reader, error) {
+func (got *Got) CatFile(ctx context.Context, prefix string, mode int) (io.Reader, error) {
 
 	f_name, dType, data, err := got.ReadObject(prefix)
 	//this error should just cause the program to exit.
@@ -168,7 +167,7 @@ func (got *Got) CatFile(prefix string, mode int) (io.Reader, error) {
 			}
 			objs := got.deserTree(prefix)
 			for _, obj := range objs {
-				rdr, err := got.CatFile(shaToString(obj.sha), 2)
+				rdr, err := got.CatFile(ctx, shaToString(obj.sha), 2)
 				if err != nil {
 					return nil, err
 				}
@@ -187,7 +186,7 @@ func (got *Got) CatFile(prefix string, mode int) (io.Reader, error) {
 //LsFiles prints to stdOut the state of staged files, i.e. the index files
 //After a Commit, it is clean
 // comeback
-func (got *Got) LsFiles(stage, cached, deleted, modified, others bool) error {
+func (got *Got) LsFiles(ctx context.Context, stage, cached, deleted, modified, others bool) error {
 
 	idx, err := readIndexFile()
 	if err != nil {
@@ -335,7 +334,7 @@ func (got *Got) status() {
 //to write a tree, we need to stage the files first i.e. index them, then from the indexed files, we write the tree
 //TODO: for now, we support only root-level files
 //WriteTree just takes the current values in the index (i.e. the staged files) and writes as tree object
-func (got *Got) WriteTree() (string, error) {
+func (got *Got) WriteTree(ctx context.Context) (string, error) {
 	// we need the mode, the path from root, and the sha1
 	idx, err := readIndexFile()
 	if err != nil {
@@ -357,7 +356,7 @@ func (got *Got) WriteTree() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("Writing Tree: %w", err)
 	}
-	hash_s := hex.EncodeToString(hash)
+	hash_s := hex.EncodeToString(hash[:])
 	return hash_s, nil
 }
 
@@ -412,9 +411,8 @@ func (got *Got) findTreeObjs(sha1 string) []string {
 	return objs
 }
 
-
 // comeback
-func (got *Got) LsTree(path string) (io.Reader, error) {
+func (got *Got) LsTree(ctx context.Context, path string) (io.Reader, error) {
 	return nil, nil
 }
 
@@ -466,27 +464,26 @@ func (got *Got) missingObjs(localSha string, remoteSha string) []string {
 //func (got *Got) Log() {}
 //output the commit info starting from the latest commit
 
-
 //  |||BRANCHING|||| //
 // comeback to implement
 
-func (got *Got) Merge(comm string) error {
+func (got *Got) Merge(ctx context.Context, comm string) error {
 	return nil
 }
-func (got *Got) Branches() (io.Reader, error ){
+func (got *Got) Branches() (io.Reader, error) {
 	var b bytes.Buffer
 	return &b, nil
 }
 
 // comeback to implement
-func (got *Got) NewBranch(name string) error {
+func (got *Got) NewBranch(ctx context.Context, name string) error {
 	return nil
 }
 
-func (got *Got) DeleteBranch(name string) error {
+func (got *Got) DeleteBranch(ctx context.Context, name string) error {
 	return nil
 }
 
-func (got *Got) Checkout(name string) error {
+func (got *Got) Checkout(ctx context.Context, name string) error {
 	return nil
 }

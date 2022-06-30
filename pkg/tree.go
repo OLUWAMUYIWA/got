@@ -13,7 +13,6 @@ import (
 	"strings"
 )
 
-// Tree OBJECT AND ITS GOT OBJECT IMPLEMENTATION!!!!!
 // tree [content size]\0[Entries having references to other trees and blobs]
 // [mode] [file/folder name]\0[SHA-1 of referencing blob or tree]
 type Tree struct {
@@ -22,7 +21,7 @@ type Tree struct {
 	data    []byte
 	cache   treeCache
 	len     int
-	cached bool
+	cached  bool
 }
 
 type treeCache struct {
@@ -115,7 +114,7 @@ func parseTree(sha string, r io.Reader) (*Tree, error) {
 
 //comeback
 // expects a partially parsed tree object as its receiver
-func (t *Tree) fullyParseTree() (error) {
+func (t *Tree) fullyParseTree() error {
 
 	for _, item := range t.entries {
 		if modType(item.mode) == blobfile {
@@ -125,7 +124,7 @@ func (t *Tree) fullyParseTree() (error) {
 			f, err := os.OpenFile(filepath.Join("", path[:2], path[2:]), os.O_RDONLY, 0)
 			defer f.Close()
 			if err != nil {
-				return  err
+				return err
 			}
 			thisTree, err := parseTree(path, f)
 
@@ -137,7 +136,7 @@ func (t *Tree) fullyParseTree() (error) {
 
 	}
 	t.cached = true
-	return  nil
+	return nil
 }
 
 type fileType uint8
@@ -164,13 +163,13 @@ func modType(m uint32) fileType {
 
 // }
 
-func (t *Tree) Hash(wkdir string) ([]byte, error) {
+func (t *Tree) Hash(wkdir string) (Sha1, error) {
 	b, err := HashObj(t.Type(), t.data, wkdir)
 	if err != nil {
 		t.sha = b
-		return b[:], nil
+		return b, nil
 	}
-	return nil, fmt.Errorf("Could not hash commit obect: %w", err)
+	return [20]byte{}, fmt.Errorf("Could not hash commit obect: %w", err)
 }
 
 func (c *Tree) Type() string {
@@ -210,7 +209,7 @@ func (t *Tree) Find(path string) (*item, error) {
 
 	pathSplits := strings.Split(path, string(os.PathSeparator))
 	for i := len(pathSplits); i > 0; i-- {
-		
+
 	}
 
 	return nil, nil
@@ -220,4 +219,3 @@ func (t *Tree) Find(path string) (*item, error) {
 func (got *Got) ReadTree(treeish string) error {
 	return nil
 }
-
