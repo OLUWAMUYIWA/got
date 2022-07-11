@@ -188,8 +188,10 @@ func (c *commit) Run(ctx context.Context) error {
 }
 
 type config struct {
-	section, key, value   string
+	path                  []string
+	value                 string
 	local, global, system bool
+	rmd                   int // read = 0, add/modify = 1, delete = 2
 }
 
 func (c *config) validate() (int, error) {
@@ -213,15 +215,20 @@ func (c *config) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if c.value == "" {
-		rdr, err := got.ShowConf(c.section, c.key, where)
+	if c.rmd == 0 { // read
+		rdr, err := got.ShowConf(c.path, where)
 		if err != nil {
 			return err
 		}
 		_, err = io.Copy(os.Stdout, rdr)
 		return err
+	} else if c.rmd == 1 { // modify or add
+		// either add or modify property
+		return got.UpdateConf(c.path, c.value, where)
+	} else if c.rmd == 2 {
+		return got.Delete(c.path, where)
 	} else {
-		return got.UpdateConf(c.section, c.key, c.value, where)
+		return fmt.Errorf("Invalid aruments")
 	}
 }
 

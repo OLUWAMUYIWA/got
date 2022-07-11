@@ -102,6 +102,9 @@ func (a *app) parseArgs(ctx context.Context) (Runner, error) {
 	configCmd.BoolVar(&local, "local", false, "apply config locally")
 	configCmd.BoolVar(&global, "global", false, "apply config globally for user")
 	configCmd.BoolVar(&system, "system", false, "apply config system-wide for all users")
+	var cread, unset bool
+	configCmd.BoolVar(&cread, "get", false, "says it should set the confiuration")
+	configCmd.BoolVar(&unset, "unset", false, "unsets the value")
 
 	// diff
 	diffCmd := flag.NewFlagSet("diff", flag.ExitOnError)
@@ -334,26 +337,32 @@ func (a *app) parseArgs(ctx context.Context) (Runner, error) {
 
 	case configCmd.Parsed():
 		{
+			conf := new(config)
 			cargs := configCmd.Args()
 			if len(cargs) < 1 {
 				return nil, fmt.Errorf("Confing suports min of one argument")
 			}
 			sekKey := strings.Split(cargs[0], ".")
+			conf.path = sekKey
 			val := ""
-			if len(cargs) == 2 {
+
+			if unset { // delete
+				conf.rmd = 2
+			} else if cread || len(cargs) == 1 {
+				conf.rmd = 0
+			} else if len(cargs) == 2 {
 				val = cargs[1]
+				conf.rmd = 1 // if val is provided, its either an add or modify op
 			}
+
 			if len(cargs) > 2 {
 				return nil, fmt.Errorf("Confing suports max of two arguments")
 			}
-			return &config{
-				section: sekKey[0],
-				key:     sekKey[1],
-				value:   val,
-				local:   local,
-				global:  global,
-				system:  system,
-			}, nil
+			conf.local = local
+			conf.global = global
+			conf.system = system
+			conf.value = val
+			return conf, nil
 		}
 
 	case diffCmd.Parsed():

@@ -49,9 +49,9 @@ func Config(conf User) error {
 type lineType uint8
 
 const (
-	comment lineType = 1 << iota //used for comment lines or empty lines
+	comment lineType = 1 << iota //used for comment lines
 	section                      //section title
-	kv                           //key-value
+	kv                           //key-value. i.e. property
 	emt                          //empty line
 )
 
@@ -250,11 +250,16 @@ const (
 )
 
 // comeback
-func (g *Got) ShowConf(section, key string, where int) (io.Reader, error) {
+func (g *Got) ShowConf(path []string, where int) (io.Reader, error) {
+
 	return nil, nil
 }
 
 // comeback
-func (g *Got) UpdateConf(section, key, value string, where int) error {
+func (g *Got) UpdateConf(path []string, value string, where int) error {
+	return nil
+}
+
+func (g *Got) Delete(path []string, where int) error {
 	return nil
 }
