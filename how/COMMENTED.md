@@ -166,3 +166,31 @@ func mapint64ToBytes(t int64) [4]byte {
 // 	b.Write(space_fill)
 // 	return b.Bytes()
 // }
+
+
+<!-- type User struct {
+	Uname string `json: Uname`
+	Email string `json: Email`
+}
+
+func Config(conf User) error {
+	confRoot, err := os.UserConfigDir()
+	if err != nil {
+		return &OpErr{Context: "IO: While getting the config directory", inner: err}
+	}
+	err = os.Mkdir(filepath.Join(confRoot, ".git"), os.ModeDir)
+	if err != nil {
+		return &OpErr{Context: "IO: While creating direcctory In Config", inner: err}
+	}
+	f, err := os.Create(filepath.Join(confRoot, ".git", ".config"))
+	if err != nil {
+		return &OpErr{Context: "IO: While creating .config file", inner: err}
+	}
+	enc := json.NewEncoder(f)
+	err = enc.Encode(conf)
+	if err != nil {
+		return &OpErr{Context: "While encoding json", inner: err}
+	}
+
+	return nil
+} -->

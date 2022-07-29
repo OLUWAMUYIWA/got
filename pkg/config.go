@@ -3,48 +3,24 @@ package pkg
 import (
 	"bufio"
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io"
 	"io/fs"
 	"os"
-	"path/filepath"
 	"regexp"
-	"strings"
+	"sort"
 )
+
+type User struct {
+	Uname string
+	Email string
+}
 
 //NB: this is a much simplified version of Git's configuration
 //read: https://git-scm.com/docs/git-config
 //I used regexp here. read: https://github.com/google/re2/wiki/Syntax . it's quite interesting and straightforward
 //This is actually one of the hardest parts of the project, the third or fourth hardest perhaps. I had to parse the whole thing by hand
 //we parse the git config line by line because it is human readable, editable as well as machine-readable and editable
-
-type User struct {
-	Uname string `json: Uname`
-	Email string `json: Email`
-}
-
-func Config(conf User) error {
-	confRoot, err := os.UserConfigDir()
-	if err != nil {
-		return &OpErr{Context: "IO: While getting the config directory", inner: err}
-	}
-	err = os.Mkdir(filepath.Join(confRoot, ".git"), os.ModeDir)
-	if err != nil {
-		return &OpErr{Context: "IO: While creating direcctory In Config", inner: err}
-	}
-	f, err := os.Create(filepath.Join(confRoot, ".git", ".config"))
-	if err != nil {
-		return &OpErr{Context: "IO: While creating .config file", inner: err}
-	}
-	enc := json.NewEncoder(f)
-	err = enc.Encode(conf)
-	if err != nil {
-		return &OpErr{Context: "While encoding json", inner: err}
-	}
-
-	return nil
-}
 
 type lineType uint8
 
@@ -64,19 +40,41 @@ const (
 var (
 	rCmt   = regexp.MustCompile(`(?m)^\s*(?P<cmt>[#;]\w+)$`)
 	rEmt   = regexp.MustCompile(`(?m)^\s*$`)
-	rNumb  = regexp.MustCompile(`\A\s*(?P<num>-?\d+)\z`)                                                      //might not need this
-	rSectn = regexp.MustCompile(`(?im)^\s*\[(?P<sect>\w+)( "(?P<subsect>\w*)")?\]\s*(?P<cmt>[#;]\s*\w\s*)?$`) //may have comments in front
-	rKv    = regexp.MustCompile(`(?im)\A\s*(?P<key>[[:alpha:]]\w*)\s*=\s*(?P<val>\w+)\s*(?P<cmt>#\s*\w\s*)?$`)
+	rNumb  = regexp.MustCompile(`(?m)^\s*(?P<num>-?\d+)$`)                                                         //might not need this
+	rSectn = regexp.MustCompile(`(?im)^\s*\[(?P<sect>\w+)(\s+"(?P<subsect>\w*)\s*")?\]\s*(?P<cmt>[#;]\s*\w\s*)?$`) //may have comments in front
+	rKv    = regexp.MustCompile(`(?im)^\s*(?P<key>\w+)\s+=\s+(?P<val>\w+)\s*(?P<cmt>[#;]\s*\w\s*)?$`)
 )
 
-type ConfigParse struct {
+type Config struct {
 	sections map[string]Section
+}
+
+type key struct {
+	pos  int
+	name string
 }
 
 type Section struct {
 	count int  //needed so we can arrange it back
-	title Line //the title line contains a KV too, but ere, the key is the section string and the value is the subsection string
+	title Line //the title line contains a KV too, but here, the key is the section string and the value is the subsection string
 	subs  []Line
+}
+
+func (s Section) write(w io.Writer) error {
+	var err error
+	// first write title
+	_, err = w.Write(s.title.cont)
+	if err != nil {
+		return err
+	}
+	// write everything else including empty lines and comments that precede the next section
+	for _, l := range s.subs {
+		_, err = w.Write(l.cont)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 //if comment, k is empty. if sect, k is sect, v is subsect if it exists.
@@ -106,9 +104,8 @@ func newSect(sectCount int) Section {
 	}
 }
 
-func parseConfig(basepath string) (*ConfigParse, error) {
+func parseConfig(basepath string) (*Config, error) {
 	// root, err := os.UserCacheDir()
-	//conf := filepath.Join(path, ".git")
 	data, err := fs.ReadFile(os.DirFS(basepath), ".config")
 	if err != nil {
 		return nil, fmt.Errorf("Parsing Config error: %w", err)
@@ -123,26 +120,23 @@ func parseConfig(basepath string) (*ConfigParse, error) {
 		lineCount := 0 //initialize the line count. needed when we're saving config back
 		line := scanner.Bytes()
 		if rCmt.Match(line) {
-			currSect.subs = append(currSect.subs, Line{count: lineCount, cont: rCmt.FindSubmatch(line)[rCmt.SubexpIndex("cmt")]})
-			lineCount += 1
+			currSect.subs = append(currSect.subs, parseCmt(line, lineCount))
 		} else if rSectn.Match(line) {
 			//new section discovered. wrap up old one
 			sectCount += 1
 			currSect = newSect(sectCount) //new currSect
 			currSect.title = parseSect(line, lineCount)
 			sections[string(currSect.title.kv.k)] = currSect
-			lineCount += 1
 		} else if rKv.Match(line) {
 			kv := parseKv(line, lineCount)
 			//TODO check if currSect.title is nil. return error
 			currSect.subs = append(currSect.subs, kv)
-			lineCount += 1
 		} else if rEmt.Match(line) { //empty line comes after the other matches because i'm afraid other matches may match it
-			currSect.subs = append(currSect.subs, Line{count: lineCount})
-			lineCount += 1
+			currSect.subs = append(currSect.subs, parseEmpty(lineCount))
 		} else {
 			return nil, fmt.Errorf("Could not match line: %d", lineCount+2) // linecount +2 because, first we're indexing from zero, and second, it is the line after the last lineCount that is not being matched
 		}
+		lineCount += 1
 	}
 	return nil, nil
 }
@@ -190,56 +184,112 @@ func parseEmpty(count int) Line {
 	}
 }
 
-func (conf *ConfigParse) add(k, v string) error {
-	splits := strings.Split(k, ".")
-	key, rest := splits[0], splits[1:]
-	sect, ok := conf.sections[key]
-	if ok { // section already exists
-		switch len(sect.title.kv.v) { //does it have a subsection or not? sect.title.kv.v stores the subsection of the section.
-		case 0:
-			{ //no subsection
-				l := len(rest)
-				if l != 1 {
-					return fmt.Errorf("More or less depth than expected")
-				} else {
-					for i, l := range conf.sections[key].subs {
-						if bytes.Compare(l.kv.k, []byte(rest[0])) == 0 { //this is the k-v pair in question
-							conf.sections[key].subs[i].kv.v = []byte(v)
-						}
-					}
-				}
-			}
-		case 1: // there's a subsection
-			{
-				l := len(rest)
-				if l != 2 {
-					return fmt.Errorf("More or Less depth than expected")
-				} else if bytes.Compare(sect.title.kv.v, []byte(rest[0])) == 0 { //is it the exact subsection we want?
-					for i, val := range conf.sections[key].subs {
-						if bytes.Compare(val.kv.k, []byte(rest[1])) == 0 { //is this the exact kv that we want?
-							conf.sections[key].subs[i].kv.v = []byte(v)
-						}
-					}
-				} else { //subsection did not exist before, create it
-
-				}
-			}
-		}
-	} else { //new
-
+func joinKV(a, b []byte, endCmt []byte) []byte {
+	joined := bytes.Join([][]byte{a, b}, []byte(" = "))
+	if len(endCmt) == 0 { // no comment.
+		return joined
+	} else {
+		return bytes.Join([][]byte{joined, endCmt}, bytes.Join([][]byte{[]byte(";"), endCmt}, []byte(" ")))
 	}
-	//conf.sections[key] = sect
-	conf.Save()
+}
+
+func insert[T any](slice []T, item T, i int) []T {
+	l := slice[:i]
+	r := make([]T, len(slice)-i)
+	copy(r, slice[i:])
+	l = append(l, item)
+	l = append(l, r...)
+	return l
+}
+
+func (conf *Config) add(path []string, v string, w io.WriteCloser) error {
+	if len(path) == 2 {
+		sect, ok := conf.sections[path[0]]
+		if ok { // section already exists
+			if len(sect.title.kv.v) != 0 { //does it have a subsection or not?
+				return fmt.Errorf("less depth provided than expected")
+			}
+			for _, l := range sect.subs {
+				if bytes.Compare(l.kv.k, []byte(path[1])) == 0 { //this is the k-v pair in question
+					l.kv.v = []byte(v)
+					l.cont = joinKV(l.kv.k, l.kv.v, l.cmt.text) // so it will be printable
+					break
+				}
+			}
+		} else {
+			// create a new line and append it
+			l := Line{} // i dont know how to specify the count for tis particular line, and i dot know if it is useful
+			l._type = kv
+			l.kv.k = []byte(path[1])
+			l.kv.v = []byte(v)
+			l.cont = joinKV(l.kv.k, l.kv.v, nil)
+			last := 0
+			for i, l := range sect.subs { // record the last known kv line inside last
+				if l._type == kv {
+					last = i
+				}
+			}
+			sect.subs = insert(sect.subs, l, last)
+		}
+
+	} else if len(path) == 3 {
+		sect, ok := conf.sections[path[0]]
+		if ok { // section already exists
+			if len(sect.title.kv.v) != 0 && bytes.Equal(sect.title.kv.v, []byte(path[1])) { // match the key exists in that path
+				for i, l := range sect.subs {
+					if bytes.Compare(l.kv.k, []byte(path[2])) == 0 { //this is the k-v pair in question
+						sect.subs[i].kv.v = []byte(v)
+						break
+					}
+				}
+			} else if !bytes.Equal(sect.title.kv.v, []byte(path[1])) { // new subsection. create it and then create a new kv
+
+			} else { //error
+				return fmt.Errorf(" depth provided is more than expected or invalid path")
+			}
+
+		} else {
+			// create a new line and append it
+			l := Line{} // i dont know how to specify the count for tis particular line, and i dot know if it is useful
+			l._type = kv
+			l.kv.k = []byte(path[1])
+			l.kv.v = []byte(v)
+			l.cont = joinKV(l.kv.k, l.kv.v, nil)
+			last := 0
+			for i, l := range sect.subs { // record the last known kv line inside last
+				if l._type == kv {
+					last = i
+				}
+			}
+			sect.subs = insert(sect.subs, l, last)
+		}
+	} else {
+		return fmt.Errorf("we dont expect paths with length greater than 3 or less than 2")
+	}
+
+	return conf.save(w)
+}
+
+func (conf *Config) save(w io.Writer) error {
+	sect := make([]Section, len(conf.sections))
+	i := 0
+	for _, s := range conf.sections {
+		sect[i] = s
+		i++
+	}
+	sort.Slice(sect, func(i, j int) bool {
+		return sect[i].count < sect[j].count
+	})
+	for _, s := range sect {
+		if err := s.write(w); err != nil {
+			return err
+		}
+	}
 
 	return nil
 }
 
-//todo: use the sorted keys trick to sort the map based on the keys here
-func (conf *ConfigParse) Save() error {
-	return nil
-}
-
-func InitCinfig(path string) (*ConfigParse, error) {
+func InitCinfig(path string) (*Config, error) {
 	return nil, nil
 }
 

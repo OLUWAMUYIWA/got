@@ -201,6 +201,6 @@ func (c *Comm) Encode(w io.Writer) error {
 func (c *Comm) String() string {
 	return fmt.Sprintf(
 		"commit %s\nAuthor: %s <%s>\nDate:   %s\n\n%s\n",
-		c.sha, c.author.name, c, c.author.email, c.author.time.Format(RFC2822), c.msg)
+		c.sha, c.author.name, c.author.email, c.author.time.Format(RFC2822), c.msg)
 	//comeback for indenting
 }
