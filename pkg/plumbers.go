@@ -219,7 +219,7 @@ func (got *Got) LsFiles(ctx context.Context, stage, cached, deleted, modified, o
 	return nil
 }
 
-//we want to know the file that were changes, the ones that were deleted, and the ones that were added
+// we want to know the files that were changed, the ones that were deleted, and the ones that were added
 func (got *Got) get_status() ([]string, []string, map[string]string) {
 	if is, _ := IsGit(); !is {
 		got.logger.Fatalf("Not a valid git directory\n")
@@ -232,8 +232,8 @@ func (got *Got) get_status() ([]string, []string, map[string]string) {
 	entries := make([]fs.DirEntry, 0)
 	var files []string
 	//do two things at the same time: ensure .git is not inncludesd in files, and fill up files with all cleaned paths to non-dir files
-	//TODO check if DrFS should be this `.`
-	fs.WalkDir(os.DirFS("."), ".", func(path string, d fs.DirEntry, err error) error {
+	//comeback check if DrFS should be this `.`
+	fs.WalkDir(os.DirFS(got.WkDir()), ".", func(path string, d fs.DirEntry, err error) error {
 		if d.IsDir() && d.Name() == ".git" {
 			return fs.SkipDir
 		}
@@ -258,6 +258,7 @@ func (got *Got) get_status() ([]string, []string, map[string]string) {
 		index_map[string(ind.path)] = ind
 	}
 	//stored hash in index differs from the new hash, these ones have been modified. They are being tracked
+	// comeback ensure the file names are absolute
 	modified := func(files []string) {
 		for _, f_path := range files {
 			if ind, ok := index_map[f_path]; ok {
@@ -309,18 +310,18 @@ func (got *Got) status() {
 	}
 	add, del, mod := got.get_status()
 	var s strings.Builder
-	if len(mod) != 0 {
-		s.WriteString("Modified files\n")
-	}
+
 	if len(add) != 0 {
 		s.WriteString(fmt.Sprintf("Untracked  Files: \n%v\n", add))
 	}
 	if len(del) != 0 {
 		s.WriteString(fmt.Sprintf("Deleted Files: \n%v\n", del))
 	}
-
+	if len(mod) != 0 {
+		s.WriteString("Modified files\n")
+	}
 	for k, v := range mod {
-		d, err := diff([]byte(k), []byte(v))
+		d, err := diff(k, v)
 		if err != nil {
 			break
 		}

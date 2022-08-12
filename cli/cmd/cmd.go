@@ -139,8 +139,8 @@ func (a *app) parseArgs(ctx context.Context) (Runner, error) {
 	lsFilesCmd.BoolVar(&lmodified, "m", false, "Show modified files in the output ")
 	lsFilesCmd.BoolVar(&lothers, "o", false, "Show untracked files in the output ")
 
-	//ls-tree
-	lsTreeCmd := flag.NewFlagSet("ls-tree", flag.ExitOnError)
+	// //ls-tree
+	// lsTreeCmd := flag.NewFlagSet("ls-tree", flag.ExitOnError)
 
 	//merge
 	mergeCmd := flag.NewFlagSet("merge", flag.ExitOnError)
@@ -153,8 +153,8 @@ func (a *app) parseArgs(ctx context.Context) (Runner, error) {
 	// push
 	pushCmd := flag.NewFlagSet("push", flag.ExitOnError)
 
-	//read-tree
-	readTreeCmd := flag.NewFlagSet("read-tree", flag.ExitOnError)
+	// //read-tree
+	// readTreeCmd := flag.NewFlagSet("read-tree", flag.ExitOnError)
 
 	// remote
 	rmtCmd := flag.NewFlagSet("remote", flag.ExitOnError)
@@ -229,16 +229,16 @@ func (a *app) parseArgs(ctx context.Context) (Runner, error) {
 		initCmd.Parse(args[1:])
 	case "ls-files":
 		lsFilesCmd.Parse(args[1:])
-	case "ls-tree":
-		lsTreeCmd.Parse(args[1:])
+	// case "ls-tree":
+	// 	lsTreeCmd.Parse(args[1:])
 	case "merge":
 		mergeCmd.Parse(args[1:])
 	case "pull":
 		pullCmd.Parse(args[1:])
 	case "push":
 		pushCmd.Parse(args[1:])
-	case "read-tree":
-		readTreeCmd.Parse(args[1:])
+	// case "read-tree":
+	// 	readTreeCmd.Parse(args[1:])
 	case "remote":
 		rmtCmd.Parse(args[1:])
 	case "rm":
@@ -412,15 +412,15 @@ func (a *app) parseArgs(ctx context.Context) (Runner, error) {
 			}, nil
 		}
 
-	case lsTreeCmd.Parsed():
-		{
-			if len(lsTreeCmd.Args()) != 1 {
-				return nil, fmt.Errorf("Error parrsing args, expected one argument: path")
-			}
-			return &lsTree{
-				path: lsTreeCmd.Arg(0),
-			}, nil
-		}
+	// case lsTreeCmd.Parsed():
+	// 	{
+	// 		if len(lsTreeCmd.Args()) != 1 {
+	// 			return nil, fmt.Errorf("Error parrsing args, expected one argument: path")
+	// 		}
+	// 		return &lsTree{
+	// 			path: lsTreeCmd.Arg(0),
+	// 		}, nil
+	// 	}
 
 	case mergeCmd.Parsed():
 		{
@@ -456,15 +456,15 @@ func (a *app) parseArgs(ctx context.Context) (Runner, error) {
 			}, nil
 		}
 
-	case readTreeCmd.Parsed():
-		{
-			if len(readTreeCmd.Args()) != 1 {
-				return nil, fmt.Errorf("Error parsing flags")
-			}
-			return &readTree{
-				treeish: readTreeCmd.Arg(0),
-			}, nil
-		}
+	// case readTreeCmd.Parsed():
+	// 	{
+	// 		if len(readTreeCmd.Args()) != 1 {
+	// 			return nil, fmt.Errorf("Error parsing flags")
+	// 		}
+	// 		return &readTree{
+	// 			treeish: readTreeCmd.Arg(0),
+	// 		}, nil
+	// 	}
 
 	case rmtCmd.Parsed():
 		{

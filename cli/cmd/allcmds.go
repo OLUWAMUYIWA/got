@@ -309,19 +309,19 @@ func (l *lsFiles) Run(ctx context.Context) error {
 	return err
 }
 
-// Lists the contents of a given tree object, like what "ls -a" does in the current working directory.
-// path is relative to the current working directory
-// output format: <mode> SP <type> SP <object> TAB <file>
-type lsTree struct {
-	path string
-}
+// // Lists the contents of a given tree object, like what "ls -a" does in the current working directory.
+// // path is relative to the current working directory
+// // output format: <mode> SP <type> SP <object> TAB <file>
+// type lsTree struct {
+// 	path string
+// }
 
-func (l *lsTree) Run(ctx context.Context) error {
-	got := pkg.NewGot()
-	rdr, err := got.LsTree(ctx, l.path)
-	io.Copy(os.Stdout, rdr)
-	return err
-}
+// func (l *lsTree) Run(ctx context.Context) error {
+// 	got := pkg.NewGot()
+// 	rdr, err := got.LsTree(ctx, l.path)
+// 	io.Copy(os.Stdout, rdr)
+// 	return err
+// }
 
 type merge struct {
 	comm string
@@ -360,15 +360,15 @@ func (p *push) Run(ctx context.Context) error {
 	return err
 }
 
-// git-read-tree - Reads tree information into the index
-type readTree struct {
-	treeish string
-}
+// // git-read-tree - Reads tree information into the index
+// type readTree struct {
+// 	treeish string
+// }
 
-func (r *readTree) Run(ctx context.Context) error {
-	got := pkg.NewGot()
-	return got.ReadTree(r.treeish)
-}
+// func (r *readTree) Run(ctx context.Context) error {
+// 	got := pkg.NewGot()
+// 	return got.ReadTree(r.treeish)
+// }
 
 type remote struct {
 	name  string
