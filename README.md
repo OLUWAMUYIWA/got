@@ -1,4 +1,12 @@
+
+
+* tough call to ake, but i'm pausing this project for now. I hope i can come back to it later. I made se3veral mistakes in working on this, the most significant being that i did not write unit tests as i progressed. i also made it much bigger than i planned. now, i have other things im working on, and i find those things more interesting at the moment, and less strenous. again, i hope to return to this later. but i decided that an incomplete project is not necessarily a failed one*
+
+
+
 # got
+
+
 a minimal git client in go. 
 It uses no other dependency other than `assert` for testing. Everything else is from the `go standard library`
 I implement algorithms like `crc`, `myer's diff`, `x-delta`, and the `git protocol (http and ssh)` from scratch.
